@@ -32,7 +32,6 @@
   /* v273: START bezel retired - the panel art carries it */ /* v188 (Tim): the START bezel is GOLD - that is the stopwatch */
   
   .swunit.startunit{left:10.1%;top:48.5%;width:8.6%} /* v186 (Tim): the START bezel keeps its OWN smaller size; the unit drops by half the height difference so the button still centers, and the wider gap keeps the labels in line */
-  .startunit 
   .swunit{position:absolute;transform:translate(-50%,-50%);width:11.5%;aspect-ratio:1}.swgroup .swunit:nth-child(1){left:61.2%;top:47.8%}.swgroup .swunit:nth-child(2){left:75.1%;top:47.8%}.swgroup .swunit:nth-child(3){left:89.7%;top:47.9%}.swunit.timeunit{left:21.6%;top:48.9%;width:8.6%}
   
   *{-webkit-tap-highlight-color:rgba(0,0,0,0)}
@@ -61,7 +60,8 @@
 </div>
 <script>
 "use strict";
-// ===== Super Switchman v283 (PWA build) =====
+// ===== Super Switchman v284 (PWA build) =====
+// v284: THE DECK BUG, root cause at last (Tim's diag screenshot): every tap on the panel logged as swBtn2. A stray ".startunit" line before the base .swunit rule (an old v186-era edit) made its selector ".startunit .swunit" - a descendant rule that matches nothing - so no unit was ever positioned: every .bzel/.arcade button (position:absolute;inset:0) filled the whole #switchpad, stacked in DOM order with swBtn2 on top eating every tap. That was the dead deck all along (v281's 91x0 was a downstream symptom). Fix: the stray line is deleted; the base rule is a plain .swunit again. Harness now asserts the rule at a rule start and the corrupted pattern absent - string-presence checks could not see this. Panel v32 unchanged.
 // v283 (Tim): panel v32 - built IN LAYERS (Tim: work in layers; next time just ask): background = the pristine v10 plate, untouched (no erasing or inpainting anywhere); labels = a separate transparent layer (panel-layers/) - all five words typeset in Baloo 2 ExtraBold, START/TIME at the 24mm label size (cap 61), ONE/TWO/THREE at the 30mm size (cap 76 = 61 x 30/24 - "30mm vs 24mm, scale the label accordingly"). Discs: reference-circle check on v10 - both smalls already r98-100, no change. Panels v18-v31 superseded. Carries the v281 dead-deck fix.
 // v282 (Tim): panel v18 - the labels are the SAME SIZE at last, measured not eyeballed. Letter-fill heights in the art (flood-extracted): START 95, ONE 90, TWO 89, THREE 94 - but TIME was 76, and the v13 composite had wrapped it in a fat black underlay that made its letters read smaller still. TIME is re-rendered from its clean v7 letterforms, scaled x1.26 to a 92px fill on the family baseline, with the same outline weight as START. Carries the v281 dead-deck fix (buttons fill by inset).
 // v281 (Tim's phone, live repro + tap-log diagnosis): THE DEAD CONTROL DECK - in a real browser every deck button measured 91x0 px: the .bzel/.arcade height:100% chain hangs off .swunit, whose height comes from aspect-ratio, and percentage heights do NOT resolve through it - the buttons were full-width, ZERO-height strips no finger or click can hit. The canvas (a replaced element with a real box) worked, which is why the picture responded and the panel did not. FIX: .bzel and .arcade now fill the unit by position:absolute;inset:0 instead of percentage heights. Also carries panel v17 (START/TIME matched pair, same disc size, same font size). The v279 cascade theory was a false lead (substring matches inside the correct scoped rules) and its build never shipped.
@@ -3029,7 +3029,7 @@ window.SS={svcOpen:function(){return svcOpen;},svcArm:function(){return svcArm;}
 <script>
 (function(){
  var L=document.getElementById('diaglog'), lines=[];
- function log(s){ lines.push(s); if(lines.length>14)lines.shift(); L.textContent=lines.join('\n'); }
+ function log(s){ lines.push(s); if(lines.length>16)lines.shift(); L.textContent=lines.join('\n'); }
  function mode(){ try{ return SS.introInfo().mode; }catch(e){ return '?'; } }
  window.addEventListener('pointerdown', function(e){
    var t=e.target, id=t.id||t.className||t.tagName;
@@ -3041,7 +3041,7 @@ window.SS={svcOpen:function(){return svcOpen;},svcArm:function(){return svcArm;}
      var r=document.getElementById(i).getBoundingClientRect();
      log(i+' rect '+Math.round(r.left)+','+Math.round(r.top)+' '+Math.round(r.width)+'x'+Math.round(r.height));
    });
-   log('mode='+mode()+' — tap START once, read the log');
+   log('mode='+mode()+' - tap START once, read the log');
  }, 2500);
 })();
 </script>
