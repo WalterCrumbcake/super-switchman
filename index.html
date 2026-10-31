@@ -60,7 +60,8 @@
 </div>
 <script>
 "use strict";
-// ===== Super Switchman v293 (PWA build) =====
+// ===== Super Switchman v294 (PWA build) =====
+// v294 (Tim): "Static turnouts along track, s1-3 toggles next switch along the lanes" - Game B turnouts are FIXED SITES in each level preset; between switches the train is committed to its line. S1/S2/S3 set the NEXT switch's route (track 1/2/3), the switch locks as the train reaches it, no orders = straight through; the horn moves to a canvas tap. Westbound trains are placed by their computed MEETING point so every segment between switches keeps a survivable line. Carries v293.
 // v293 (Tim): "Make them proper turnouts" - Game B track changes are real crossovers: two reverse arcs (an S, run 220) drawn as branch rails with ties and a switch stand; ONE/TWO throw the switch (B.want), the train takes the curve as the world carries it and the wagons follow the same rails car by car; a switch thrown during SWITCHTIME waits with the frozen world, like Game A. Title line corrected to THE RUN EAST. Carries v292.
 // v292 (Tim): Game B is REBUILT as a side scroller - one train east, hazards and oncoming traffic, horn for livestock, ghost train the wildcard; each level a seeded preset that stays put. The v291 switch-yard Game B is retired whole. Carries v291.
 // v291 (Tim): GAME B - a second game in the cabinet, chosen in SERVICE (GAME row). Five tunnels in, three exits out; 5 crossover switches drop trains one line down; ONE/TWO walk the Switchman between posts, THREE throws the switch he mans. Exits have speeds not yards (1 EXPRESS double, 2 CENTRAL, 3 SLOW half); trains collide on shared track; the GHOST train never collides and scores anywhere. Game A untouched; B keeps its own high-score tables. Carries v290.
@@ -1634,7 +1635,7 @@
 // follows edges. (Supersedes v15's three-junction
 // main line — in the sketch the fan hangs off one trunk, not the main.)
 var W=540,H=640;
-var VERSION="v293"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
+var VERSION="v294"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
 var DEST=[
  null,
  {n:1,name:"RED ROCK", color:"#e53935"},
@@ -1902,10 +1903,7 @@ function onPointer(e){
  if(S.mode==="ready"){startGame();return true;}
  if(S.mode==="over"){if(overStartT>=0&&(ANIM_T-overStartT)<4.9){overStartT=ANIM_T-4.9;return true;} toggleStart();return true;} // v270: a canvas tap during the rage film skips to game over as it was; START keeps its classic job
  if(S.mode==="table"){tableTap(p);return true;}
- if(S.gameB&&S.mode==="run"){ // v292: tap above the train to step up, below to step down, on it to honk
-  var pyB=laneY(S.b.laneF);
-  if(p.y<pyB-42)bControl(0);else if(p.y>pyB+42)bControl(1);else bControl(2);
-  return true;}
+ if(S.gameB&&S.mode==="run"){ bHorn(); return true; } // v294: a tap is the horn
  for(var i=0;i<3;i++){
   var dx=p.x-LEVERS[i].x,dy=p.y-LEVERS[i].y;
   if(dx*dx+dy*dy<=62*62)return flipSwitch(i);          // lever: big finger target
@@ -2213,43 +2211,48 @@ var BLANES_Y=[210,320,430];
 function laneY(f){return 210+f*110;}
 function bRng(seed){var a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 function genB(level){
- // one seeded layout per level - a gate never fouls all three tracks, and
- // consecutive gates always leave a free track within one step of the last
- // gate's free track, so the run east is always humanly makeable
+ // one seeded layout per level. STATIC TURNOUT SITES are part of the
+ // preset: between two sites the train is committed to its line, so the
+ // law is per SEGMENT - the hazards of a segment (westbound trains count
+ // at their computed MEETING point) never foul every track, and segment 0
+ // never fouls track 2, the line the run starts on.
  var rng=bRng(level*7919+101);
- var len=3400+level*500,events=[],gx=680,prevFree=[0,1,2];
+ var sc=Math.min(235,148+(level-1)*11);
+ var len=3800+level*550,events=[],sites=[];
+ var sx=480;
+ while(sx<len-650){sites.push(sx);sx+=860+Math.floor(rng()*280);}
  var bag=['on','rock','on','cow','rock','on','ghost','rock'];
- while(gx<len-520){
-  var nBlock;
-  if(rng()<0.10&&level<=2&&gx>=1600)nBlock=0;
-  else nBlock=rng()<0.5+Math.min(0.2,level*0.03)?2:1;
-  if(level===1&&gx<1250)nBlock=Math.min(nBlock,1);
-  var blocked=null,free=null,tries=0;
-  while(tries<10&&!blocked){
-   var lanes=[0,1,2];
-   for(var s=2;s>0;s--){var j=Math.floor(rng()*(s+1)),tmp=lanes[s];lanes[s]=lanes[j];lanes[j]=tmp;}
-   var cand=lanes.slice(0,nBlock);
-   var fr=[0,1,2].filter(function(l){return cand.indexOf(l)<0;});
-   var ok=fr.some(function(f){return prevFree.some(function(p){return Math.abs(f-p)<=1;});});
-   if(ok){blocked=cand;free=fr;}
-   tries++;
-  }
-  if(!blocked){free=[prevFree[0]];blocked=[0,1,2].filter(function(l){return l!==prevFree[0];});}
-  prevFree=free;
-  for(var b=0;b<blocked.length;b++){
-   var ty=bag[Math.floor(rng()*bag.length)];
-   var evx=Math.round(gx+(b===1?26:0));
-   if(ty==='on'){ // westbound trains keep their distance: two movers arriving
-    for(var q=0;q<events.length;q++){var pv=events[q]; // together can interlock
-     if(pv.t==='on'&&Math.abs(pv.x-evx)<560){ty='rock';break;}} // a turnout's timing
+ for(var seg=0;seg<=sites.length;seg++){
+  var z0=seg===0?240:sites[seg-1]+480;
+  var z1=seg<sites.length?sites[seg]-80:len-420;
+  var segFree=[0,1,2];
+  var cx=z0+Math.floor(rng()*60);
+  while(cx<z1){
+   var nBlock;
+   if(rng()<0.10&&level<=2&&cx>=1600)nBlock=0;
+   else nBlock=rng()<0.5+Math.min(0.2,level*0.03)?2:1;
+   if(level===1&&cx<1250)nBlock=Math.min(nBlock,1);
+   if(nBlock>0){
+    var pool=[0,1,2].filter(function(l){return !(seg===0&&l===1);});
+    for(var s2=pool.length-1;s2>0;s2--){var j2=Math.floor(rng()*(s2+1)),t2=pool[s2];pool[s2]=pool[j2];pool[j2]=t2;}
+    var blocked=[];
+    for(var b=0;b<pool.length&&blocked.length<nBlock;b++){
+     if(segFree.some(function(l){return l!==pool[b]&&blocked.indexOf(l)<0;}))blocked.push(pool[b]);
+    }
+    blocked.forEach(function(lane,bi){
+     var ty=bag[Math.floor(rng()*bag.length)],ex=Math.round(cx+(bi===1?26:0)),ev;
+     if(ty==='on'||ty==='ghost'){ // placed so it MEETS the train at ex
+      var sp=Math.round(115+level*7+rng()*45),gx=Math.round(ex*(sc+sp)/sc);
+      ev={t:ty,lane:lane,x:gx,passed:false,dead:false,flee:0,yOff:0,sp:sp};
+     }else ev={t:ty,lane:lane,x:ex,passed:false,dead:false,flee:0,yOff:0,sp:0};
+     events.push(ev);
+    });
+    segFree=segFree.filter(function(l){return blocked.indexOf(l)<0;});
    }
-   var ev={t:ty,lane:blocked[b],x:evx,passed:false,dead:false,flee:0,yOff:0,sp:0};
-   if(ty==='on'||ty==='ghost')ev.sp=Math.round(115+level*7+rng()*45);
-   events.push(ev);
+   cx+=300+Math.floor(rng()*90);
   }
-  gx+=Math.max(420,430+Math.floor(rng()*110)-Math.min(40,level*3));
  }
- return {len:len,events:events};
+ return {len:len,events:events,sites:sites};
 }
 function bScroll(){return Math.min(235,148+(S.level-1)*11);}
 // v293: a turnout between the parallel tracks is two reverse arcs - an S
@@ -2281,21 +2284,24 @@ function pathAng(wx){
  }
  return 0;
 }
+function makeCross(x0,from,to){
+ var d=(to-from)*110,s=d>0?1:-1,h=CROSS_L/2,w=Math.abs(d)/2;
+ return {x0:x0,from:from,to:to,s:s,h:h,w:w,R:(h*h+w*w)/(2*w),done:false};
+}
 function bCrossUpdate(){ // start/finish turnouts as the world carries the train
  var B=S.b,list=B.crossList,last=list[list.length-1];
  if(last&&!last.done){
   if(B.px-last.x0>=CROSS_L){last.done=true;B.lane=last.to;}
  }else if(B.want!==B.lane){
-  var to=B.lane+(B.want>B.lane?1:-1),d=(to-B.lane)*110,s=d>0?1:-1,h=CROSS_L/2,w=Math.abs(d)/2;
-  list.push({x0:B.px,from:B.lane,to:to,s:s,h:h,w:w,R:(h*h+w*w)/(2*w),done:false});
+  list.push(makeCross(B.px,B.lane,B.lane+(B.want>B.lane?1:-1)));
   B.crossCount++;
  }
  B.laneF=pathLaneF(B.px);
  B.crossList=list.filter(function(c){return c.x0+CROSS_L>B.px-200;});
 }
-function drawCrossB(c){ // one thrown turnout, drawn as a real branch
+function drawCrossB(c,ink){ // one thrown turnout, drawn as a real branch
  var B=S.b;if(c.x0+CROSS_L<B.px-260||c.x0>B.px+460)return;
- var INK="#b0bec5",t;
+ var INK=ink||"#b0bec5",t;
  function pt(t2){return [c.x0+t2-B.px+150,laneY(c.from+c.s*crossY(c,t2)/110)];}
  for(t=6;t<CROSS_L;t+=26){var p=pt(t),a=Math.atan(c.s*crossSlope(c,t)),nx=-Math.sin(a),ny=Math.cos(a);
   ctx.fillStyle=INK;
@@ -2312,22 +2318,27 @@ function drawCrossB(c){ // one thrown turnout, drawn as a real branch
 }
 function bLoadLevel(){
  var g=genB(S.level),B=S.b;
- B.len=g.len;B.events=g.events;B.px=0;B.lane=1;B.laneF=1;B.want=1;B.crossList=[];B.bannerT=1.8;B.invulnT=0;
+ B.len=g.len;B.events=g.events;B.sites=g.sites.map(function(x){return {x:x,route:null,locked:false};});B.px=0;B.lane=1;B.laneF=1;B.want=1;B.crossList=[];B.bannerT=1.8;B.invulnT=0;
 }
 function bInit(){
- S.b={px:0,lane:1,laneF:1,want:1,crossList:[],crossCount:0,events:[],len:0,hornT:0,invulnT:0,bannerT:1.8,booms:[]};
+ S.b={px:0,lane:1,laneF:1,want:1,crossList:[],crossCount:0,events:[],sites:[],len:0,hornT:0,invulnT:0,bannerT:1.8,booms:[]};
  bLoadLevel();
 }
 function sndHorn(){beep(311,0.28,"square",0.06);beep(466,0.28,"square",0.05);}
-function bControl(i){ // Game B panel: ONE/TWO throw the next turnout, THREE the horn
+function bControl(i){ // S1 S2 S3 set the NEXT switch along the lanes
  var B=S.b;if(!B||S.mode!=="run")return;
- if(i===0){if(B.want>0){B.want--;beep(700,0.04,"square",0.03);}else sndLock();}
- else if(i===1){if(B.want<2){B.want++;beep(700,0.04,"square",0.03);}else sndLock();}
- else{
-  B.hornT=0.45;sndHorn();
-  for(var k=0;k<B.events.length;k++){var ev=B.events[k];
-   if(ev.t==='cow'&&!ev.dead&&ev.lane===B.want&&ev.x>B.px&&ev.x-B.px<280)ev.flee=1;}
- }
+ var act=null;
+ for(var k=0;k<B.sites.length;k++)if(!B.sites[k].locked){act=B.sites[k];break;}
+ if(!act){sndLock();return;}
+ if(act.route===i)return;
+ act.route=i;sndFlip(i);
+}
+function bHorn(){ // the horn lives on a tap now (THREE is track 3)
+ var B=S.b;if(!B||S.mode!=="run")return;
+ B.hornT=0.45;sndHorn();
+ var lane=Math.round(B.laneF);
+ for(var k=0;k<B.events.length;k++){var ev=B.events[k];
+  if(ev.t==='cow'&&!ev.dead&&ev.lane===lane&&ev.x>B.px&&ev.x-B.px<280)ev.flee=1;}
 }
 function bStrike(ev){
  var B=S.b;
@@ -2339,6 +2350,8 @@ function bStrike(ev){
 function bStep(dt){
  var B=S.b;if(!B)return;
  B.px+=bScroll()*dt;
+ for(var si=0;si<B.sites.length;si++){var site=B.sites[si]; // the switch locks
+  if(!site.locked&&B.px>=site.x){site.locked=true;if(site.route==null)site.route=B.lane;B.want=site.route;}}
  bCrossUpdate();
  var i,ev;
  for(i=0;i<B.events.length;i++){ev=B.events[i];
@@ -2396,6 +2409,25 @@ function drawBoardB(){
  }
  // v293: every turnout this run has thrown, drawn as a real branch
  for(var ci=0;ci<B.crossList.length;ci++)drawCrossB(B.crossList[ci]);
+ // v294: the static switch sites - stands on every track, the NEXT one lit,
+ // its route board showing the set track and its branch drawn in pale steel
+ var actIdx=-1;
+ for(var ai=0;ai<B.sites.length;ai++)if(!B.sites[ai].locked){actIdx=ai;break;}
+ for(var si2=0;si2<B.sites.length;si2++){var st2=B.sites[si2],ssx=st2.x-B.px+150;
+  if(ssx<-280||ssx>660)continue;
+  var isAct=si2===actIdx,eff=st2.route==null?B.want:st2.route;
+  for(var sl=0;sl<3;sl++){
+   var sby=laneY(sl)+(sl===0?-24:15);
+   ctx.fillStyle=isAct?"#4e342e":"#37474f";ctx.fillRect(ssx-2,sby,4,8);
+   ctx.fillStyle=isAct&&eff===sl?"#fdd835":(isAct?"#90a4ae":"#263238");
+   ctx.fillRect(ssx-4,sby+(sl===0?-6:8),8,6);
+  }
+  if(isAct){
+   drawPixelText(String(eff+1),ssx,laneY(0)-48,3,"#fdd835","center");
+   if(eff!==B.want){var fr=B.want,st3=fr;
+    while(st3!==eff){var nx3=st3+(eff>st3?1:-1);drawCrossB(makeCross(st2.x+Math.abs(st3-fr)*CROSS_L,st3,nx3),"#617d8a");st3=nx3;}}
+  }
+ }
  // lineside poles rolling by
  var w0=Math.floor((B.px-220)/280)*280;
  for(var wx=w0;wx<B.px+560;wx+=280){
@@ -2450,7 +2482,7 @@ function drawBoardB(){
   ctx.fillRect(bsx-r,bo.y-3,r*2,6);ctx.fillRect(bsx-3,bo.y-r,6,r*2);}
  if(B.bannerT>0){
   drawPixelText("LEVEL "+S.level,W/2,300,6,"#fdd835","center");
-  if(B.bannerT<1.2)drawPixelText("GUIDE THE TRAIN EAST",W/2,336,3,"#a5d6a7","center");
+  if(B.bannerT<1.2)drawPixelText("S1 S2 S3 SET THE SWITCH - TAP HONKS",W/2,340,2,"#a5d6a7","center");
  }
 }
 function drawHudB(){
@@ -3327,7 +3359,7 @@ requestAnimationFrame(frame);
 // harness hooks: the real handlers above, exposed unchanged
 if (S.sound) S.mode = "intro"; // v242: boot into the epic intro (sound off boots straight to the title)
 window.SS={svcOpen:function(){return svcOpen;},svcArm:function(){return svcArm;},svc:function(){return svc;},svcSnd:function(){return svcSndIdx;},svcSndNames:function(){return SNDNAMES;},svcSpeed:function(){return SPEEDS[svc.spd];},diff:function(){return DIFF;},rollDest:rollDest,state:function(){return S;},manStands:function(){return MAN_STANDS;},flipSwitch:flipSwitch,switchLocked:switchLocked,onPointer:onPointer,
- nextNodeId:nextNodeId,spawnTrain:spawnTrain,startGame:startGame,bControl:bControl,bGen:genB,COW:COW,toggleStart:toggleStart,step:step,fit:fit,canvas:canvas,draw:draw,
+ nextNodeId:nextNodeId,spawnTrain:spawnTrain,startGame:startGame,bControl:bControl,bHorn:bHorn,bGen:genB,COW:COW,toggleStart:toggleStart,step:step,fit:fit,canvas:canvas,draw:draw,
  SPRITES:SPRITES,LEVERS:LEVERS,NODES:NODES,canvasPoint:canvasPoint,posBack:posBack,
  FONT:FONT,drawPixelText:drawPixelText,STRIKEBOX:STRIKEBOX,CHIPBOX:CHIPBOX,highScores:function(){return highScores;},hsPending:function(){return hsPending;},musicOn:function(){return MUS_ON;},MUSIC:MUSIC,kickMusic:kickMusic,musUnlock:musUnlock,ANTHEM:ANTHEM,BOSS:BOSS,PRE:PRE,musSong:function(){return MUS_ON?(MUS_SONG===ANTHEM?"anthem":MUS_SONG===BOSS?"boss":MUS_SONG===PRE?"pre":"title"):null;},musFc:function(){return musFilt?musFilt.frequency.value:null;},musState:function(){return AC?AC.state:"none";},cineInfo:function(){return {phase:introPhase,line:introLine,typed:introTypedCount(),panels:2,ev:introEvent||""};},introInfo:function(){return {mode:S.mode,pat:(MUS_ON&&MUS_SONG===MUSIC)?musPat:-1,row:musRow};},tableInput:tableInput,scoreQualifies:scoreQualifies,enterTable:enterTable,attractTable:attractTable,tableConfirm:tableConfirm,blazeX:blazeX,SIDE_LOCO:SIDE_LOCO,SIDE_WAGON:SIDE_WAGON,blazeInfo:blazeInfo,titleStand:function(){return titleStandFlip?2:1;},titleGag:function(){return titleFail?(titleBoomDone?"boom":(titleDerailT>0?"derail":"armed")):"none";},SIDE_LOCO_L:SIDE_LOCO_L,blazeOn:blazeOn,displayRows:displayRows,tableReveal:tableReveal};
 </script>
