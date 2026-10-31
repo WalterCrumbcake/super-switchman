@@ -60,7 +60,8 @@
 </div>
 <script>
 "use strict";
-// ===== Super Switchman v296 (PWA build) =====
+// ===== Super Switchman v297 (PWA build) =====
+// v297 (Tim, hands-on): "Still not clear if something is ahead" - the warnings move into the HUD where the zoom cannot shrink them: an AHEAD panel (one row per track: the next hazard's icon + distance pips, or CLEAR) and big flashing chevrons at the east edge for hazards still off-screen. The small in-board arrows from v296 are removed. Carries v296.
 // v296 (Tim, hands-on): "Still cant see upcoming hazards" - Game B zooms out further (0.5, about 870px of track ahead) and every track now announces its nearest off-screen hazard with a colored warning arrow at the east edge (red = westbound train, gray = rockfall, white = cow) until the hazard itself scrolls in. Carries v295.
 // v295 (Tim, hands-on): "Zoom game b out, no idea what's coming" + "turnouts start invisible" - the Game B board draws at 0.6 zoom anchored on the train (about 700px of track ahead instead of 390), every switch site's crossover track is drawn dim from the start so turnouts read as real track the moment they scroll in, and the set route previews over it in full ink. Carries v294.
 // v294 (Tim): "Static turnouts along track, s1-3 toggles next switch along the lanes" - Game B turnouts are FIXED SITES in each level preset; between switches the train is committed to its line. S1/S2/S3 set the NEXT switch's route (track 1/2/3), the switch locks as the train reaches it, no orders = straight through; the horn moves to a canvas tap. Westbound trains are placed by their computed MEETING point so every segment between switches keeps a survivable line. Carries v293.
@@ -1637,7 +1638,7 @@
 // follows edges. (Supersedes v15's three-junction
 // main line — in the sketch the fan hangs off one trunk, not the main.)
 var W=540,H=640;
-var VERSION="v296"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
+var VERSION="v297"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
 var DEST=[
  null,
  {n:1,name:"RED ROCK", color:"#e53935"},
@@ -2469,17 +2470,6 @@ function drawBoardB(){
    drawCar(sx,ey,Math.PI,c,true,ghost?0:ev.lane+1);
   }
  }
- // v296: what's still off-screen announces itself - the nearest hazard
- // on each track flies a warning arrow at the east edge until it scrolls in
- for(var wl=0;wl<3;wl++){var bev=null,besx=1e9;
-  for(i=0;i<B.events.length;i++){ev=B.events[i];
-   if(ev.dead||ev.t==='ghost'||ev.lane!==wl)continue;
-   var esx2=ev.x-B.px+150;
-   if(esx2>1015&&esx2<1750&&esx2<besx){besx=esx2;bev=ev;}}
-  if(bev){var wy2=laneY(wl);
-   ctx.fillStyle=bev.t==='on'?"#e53935":(bev.t==='cow'?"#f5f5f5":"#9e9e9e");
-   ctx.beginPath();ctx.moveTo(1018,wy2-9);ctx.lineTo(1018,wy2+9);ctx.lineTo(1002,wy2);ctx.closePath();ctx.fill();}
- }
  // the far station, when it rolls into view
  sx=B.len-B.px+150;
  if(sx>-120&&sx<1180){
@@ -2525,6 +2515,39 @@ function drawHudB(){
  ctx.fillStyle="#fdd835";ctx.fillRect(12,112,Math.max(0,Math.min(516,516*B.px/B.len)),5);
  ctx.fillStyle="#ffffff";ctx.fillRect(524,106,4,17);
  drawPixelText("STATION",528,96,2,"#a5d6a7","right");
+ // v297: the AHEAD panel - per track, the next hazard and how close it is,
+ // drawn in the HUD so the board zoom can never shrink it
+ var sc5=bScroll(),ah=[null,null,null];
+ for(var ai2=0;ai2<B.events.length;ai2++){var e2=B.events[ai2];
+  if(e2.dead||e2.passed)continue;
+  var g2=e2.x-B.px;if(g2<-40)continue;
+  if(e2.t==='on'||e2.t==='ghost')g2=g2*sc5/(sc5+e2.sp);
+  if(g2>1750)continue;
+  if(!ah[e2.lane]||g2<ah[e2.lane].g)ah[e2.lane]={t:e2.t,g:g2,x:e2.x};}
+ ctx.fillStyle="#10181c";ctx.fillRect(352,122,180,98);
+ ctx.fillStyle="#37474f";ctx.fillRect(352,122,180,2);ctx.fillRect(352,218,180,2);ctx.fillRect(352,122,2,98);ctx.fillRect(530,122,2,98);
+ drawPixelText("AHEAD",360,136,2,"#a5d6a7","left");
+ for(var rl=0;rl<3;rl++){var ry=156+rl*26,inf=ah[rl];
+  drawPixelText(String(rl+1),366,ry,3,"#e8f5e9","left");
+  if(!inf){drawPixelText("CLEAR",436,ry,2,"#43a047","left");continue;}
+  var ix=398;
+  if(inf.t==='on'||inf.t==='ghost'){var bc=inf.t==='on'?"#e53935":"#b0bec5";
+   ctx.fillStyle=bc;ctx.fillRect(ix,ry-6,28,12);ctx.fillRect(ix+20,ry-11,8,6);
+   ctx.fillStyle="#fff";ctx.fillRect(ix+22,ry-9,4,3);}
+  else if(inf.t==='rock'){ctx.fillStyle="#9e9e9e";ctx.fillRect(ix+2,ry-4,24,10);ctx.fillRect(ix+8,ry-9,12,6);}
+  else if(inf.t==='cow'){drawGlyphC(ctx,COW,ix+15,ry,2,COWPAL);}
+  var pips=inf.g>900?1:(inf.g>650?2:(inf.g>420?3:(inf.g>220?4:5)));
+  var pc=inf.g<250?"#e53935":(inf.g<550?"#ffb300":"#a5d6a7");
+  for(var pp=0;pp<5;pp++){ctx.fillStyle=pp<pips?pc:"#263238";ctx.fillRect(436+pp*17,ry-6,13,12);}
+ }
+ // v297: big flashing chevrons at the east edge for hazards still off-screen
+ var flash=Math.floor(ANIM_T*4)%2===0;
+ for(var cl=0;cl<3;cl++){var ci2=ah[cl];
+  if(!ci2)continue;
+  if(ci2.x-B.px+150<=1015)continue;
+  var csy=330+(laneY(cl)-330)*0.5;
+  ctx.fillStyle=flash?(ci2.t==='on'?"#e53935":(ci2.t==='cow'?"#f5f5f5":(ci2.t==='ghost'?"#b0bec5":"#9e9e9e"))):"#37474f";
+  ctx.beginPath();ctx.moveTo(528,csy-15);ctx.lineTo(528,csy+15);ctx.lineTo(502,csy);ctx.closePath();ctx.fill();}
 }
 function drawTrackEdgeB(x1,y1,x2,y2){
  var dx=x2-x1,dy=y2-y1,L=Math.sqrt(dx*dx+dy*dy),ux=dx/L,uy=dy/L,px=-uy,py=ux,INK="#b0bec5";
