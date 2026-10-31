@@ -60,7 +60,8 @@
 </div>
 <script>
 "use strict";
-// ===== Super Switchman v295 (PWA build) =====
+// ===== Super Switchman v296 (PWA build) =====
+// v296 (Tim, hands-on): "Still cant see upcoming hazards" - Game B zooms out further (0.5, about 870px of track ahead) and every track now announces its nearest off-screen hazard with a colored warning arrow at the east edge (red = westbound train, gray = rockfall, white = cow) until the hazard itself scrolls in. Carries v295.
 // v295 (Tim, hands-on): "Zoom game b out, no idea what's coming" + "turnouts start invisible" - the Game B board draws at 0.6 zoom anchored on the train (about 700px of track ahead instead of 390), every switch site's crossover track is drawn dim from the start so turnouts read as real track the moment they scroll in, and the set route previews over it in full ink. Carries v294.
 // v294 (Tim): "Static turnouts along track, s1-3 toggles next switch along the lanes" - Game B turnouts are FIXED SITES in each level preset; between switches the train is committed to its line. S1/S2/S3 set the NEXT switch's route (track 1/2/3), the switch locks as the train reaches it, no orders = straight through; the horn moves to a canvas tap. Westbound trains are placed by their computed MEETING point so every segment between switches keeps a survivable line. Carries v293.
 // v293 (Tim): "Make them proper turnouts" - Game B track changes are real crossovers: two reverse arcs (an S, run 220) drawn as branch rails with ties and a switch stand; ONE/TWO throw the switch (B.want), the train takes the curve as the world carries it and the wagons follow the same rails car by car; a switch thrown during SWITCHTIME waits with the frozen world, like Game A. Title line corrected to THE RUN EAST. Carries v292.
@@ -1636,7 +1637,7 @@
 // follows edges. (Supersedes v15's three-junction
 // main line — in the sketch the fan hangs off one trunk, not the main.)
 var W=540,H=640;
-var VERSION="v295"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
+var VERSION="v296"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
 var DEST=[
  null,
  {n:1,name:"RED ROCK", color:"#e53935"},
@@ -2301,7 +2302,7 @@ function bCrossUpdate(){ // start/finish turnouts as the world carries the train
  B.crossList=list.filter(function(c){return c.x0+CROSS_L>B.px-200;});
 }
 function drawCrossB(c,ink,stand){ // one turnout branch, drawn as real track
- var B=S.b;if(c.x0+CROSS_L<B.px-460||c.x0>B.px+980)return;
+ var B=S.b;if(c.x0+CROSS_L<B.px-460||c.x0>B.px+1140)return;
  var INK=ink||"#b0bec5",t;
  function pt(t2){return [c.x0+t2-B.px+150,laneY(c.from+c.s*crossY(c,t2)/110)];}
  for(t=6;t<CROSS_L;t+=26){var p=pt(t),a=Math.atan(c.s*crossSlope(c,t)),nx=-Math.sin(a),ny=Math.cos(a);
@@ -2384,7 +2385,7 @@ function bStep(dt){
   }
  }
  B.events=B.events.filter(function(e2){return !e2.dead&&e2.x>B.px-520;});
- S.man.x=120;S.man.y=330+(laneY(B.laneF)-16-330)*0.6; // the swear bubble rides over the train (v295: at its zoomed screen spot)
+ S.man.x=105;S.man.y=330+(laneY(B.laneF)-16-330)*0.5; // the swear bubble rides over the train (at its zoomed screen spot)
  if(B.px>=B.len){ // the far station: level cleared
   S.score+=400+100*S.level;sndGood();
   S.level++;bLoadLevel();
@@ -2403,20 +2404,20 @@ var COW=["00011000000000","00111111111100","01121111121110","31111111111111","01
 var COWPAL=[null,"#f5f5f5","#37474f","#f8bbd0"];
 function drawBoardB(){
  var B=S.b,i,L,sx,ev;
- // v295: the board draws ZOOMED OUT - 0.6 scale anchored on the train, so
- // roughly 700px of track ahead is on screen, not 390
+ // v295: the board draws ZOOMED OUT, anchored on the train (v296: 0.5 -
+ // roughly 870px of track ahead is on screen, not the unzoomed 390)
  ctx.save();
- ctx.translate(120,330);ctx.scale(0.6,0.6);ctx.translate(-150,-330);
+ ctx.translate(105,330);ctx.scale(0.5,0.5);ctx.translate(-150,-330);
  // the three tracks, ties scrolling with the world
  for(L=0;L<3;L++){
   tieCarry=-(B.px%13);
-  drawTrackEdgeB(-95,BLANES_Y[L],895,BLANES_Y[L]);
+  drawTrackEdgeB(-95,BLANES_Y[L],1095,BLANES_Y[L]);
  }
  // v295: every site's turnout is real track from the start - both crossover
  // curves of both lane pairs drawn dim, so a turnout reads as track the
  // moment it scrolls in; the set route previews over it in full ink
  for(var fi=0;fi<B.sites.length;fi++){var fsx=B.sites[fi].x-B.px+150;
-  if(fsx<-320||fsx>980)continue;
+  if(fsx<-320||fsx>1120)continue;
   for(var fp=0;fp<2;fp++){drawCrossB(makeCross(B.sites[fi].x,fp,fp+1),"#546e7a",false);drawCrossB(makeCross(B.sites[fi].x,fp+1,fp),"#546e7a",false);}
  }
  // v293: every turnout this run has thrown, drawn as a real branch
@@ -2426,7 +2427,7 @@ function drawBoardB(){
  var actIdx=-1;
  for(var ai=0;ai<B.sites.length;ai++)if(!B.sites[ai].locked){actIdx=ai;break;}
  for(var si2=0;si2<B.sites.length;si2++){var st2=B.sites[si2],ssx=st2.x-B.px+150;
-  if(ssx<-320||ssx>980)continue;
+  if(ssx<-320||ssx>1120)continue;
   var isAct=si2===actIdx,eff=st2.route==null?B.want:st2.route;
   for(var sl=0;sl<3;sl++){
    var sby=laneY(sl)+(sl===0?-24:15);
@@ -2442,7 +2443,7 @@ function drawBoardB(){
  }
  // lineside poles rolling by
  var w0=Math.floor((B.px-220)/280)*280;
- for(var wx=w0;wx<B.px+760;wx+=280){
+ for(var wx=w0;wx<B.px+920;wx+=280){
   sx=wx-B.px+150;
   ctx.fillStyle="#4e342e";ctx.fillRect(sx-2,478,4,44);
   ctx.fillRect(sx-11,484,22,3);
@@ -2452,7 +2453,7 @@ function drawBoardB(){
  for(i=0;i<B.events.length;i++){ev=B.events[i];
   if(ev.dead)continue;
   sx=ev.x-B.px+150;
-  if(sx<-180||sx>940)continue;
+  if(sx<-180||sx>1100)continue;
   var ey=laneY(ev.lane)+ev.yOff;
   if(ev.t==='rock'){
    ctx.fillStyle="#616161";ctx.fillRect(sx-14,ey-9,30,13);ctx.fillRect(sx-8,ey-15,17,8);
@@ -2468,9 +2469,20 @@ function drawBoardB(){
    drawCar(sx,ey,Math.PI,c,true,ghost?0:ev.lane+1);
   }
  }
+ // v296: what's still off-screen announces itself - the nearest hazard
+ // on each track flies a warning arrow at the east edge until it scrolls in
+ for(var wl=0;wl<3;wl++){var bev=null,besx=1e9;
+  for(i=0;i<B.events.length;i++){ev=B.events[i];
+   if(ev.dead||ev.t==='ghost'||ev.lane!==wl)continue;
+   var esx2=ev.x-B.px+150;
+   if(esx2>1015&&esx2<1750&&esx2<besx){besx=esx2;bev=ev;}}
+  if(bev){var wy2=laneY(wl);
+   ctx.fillStyle=bev.t==='on'?"#e53935":(bev.t==='cow'?"#f5f5f5":"#9e9e9e");
+   ctx.beginPath();ctx.moveTo(1018,wy2-9);ctx.lineTo(1018,wy2+9);ctx.lineTo(1002,wy2);ctx.closePath();ctx.fill();}
+ }
  // the far station, when it rolls into view
  sx=B.len-B.px+150;
- if(sx>-120&&sx<1020){
+ if(sx>-120&&sx<1180){
   ctx.fillStyle="#fff";for(var dsh=0;dsh<3;dsh++)ctx.fillRect(sx,BLANES_Y[dsh]-16,3,32);
   ctx.fillStyle="#263238";ctx.fillRect(sx-64,128,120,44);
   ctx.fillStyle="#fdd835";ctx.fillRect(sx-64,128,120,6);
