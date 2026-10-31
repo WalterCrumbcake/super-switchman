@@ -60,7 +60,8 @@
 </div>
 <script>
 "use strict";
-// ===== Super Switchman v286 (PWA build) =====
+// ===== Super Switchman v287 (PWA build) =====
+// v287 (Tim): the NEXT label moves DOWN (y36 -> y80) - with a five-figure score the difficulty text beside SCORE ran into it; it now sits under the chip row's left end, clear of the difficulty and the chips. Carries v286.
 // v286 (Tim): PRE intro song redone as SYNTHWAVE - A minor, Am F C G at 92 BPM under the dialog: TRI bass pumps the octave 8ths, SQ1 runs the chord arp, SQ2 pads root-to-fifth swells, four-on-the-floor kick with offbeat hats. The sparse djent PRE (70 BPM) is retired. Seeded into Chip Tracker v28. Carries v285.
 // v285 (Tim): version on the title screen, bottom left - "V285" in the (C) line's type and color on its baseline, drawn from a single VERSION constant the harness ties to this header so they can never drift. Carries v284 (deck fix) + panel v32.
 // v284: THE DECK BUG, root cause at last (Tim's diag screenshot): every tap on the panel logged as swBtn2. A stray ".startunit" line before the base .swunit rule (an old v186-era edit) made its selector ".startunit .swunit" - a descendant rule that matches nothing - so no unit was ever positioned: every .bzel/.arcade button (position:absolute;inset:0) filled the whole #switchpad, stacked in DOM order with swBtn2 on top eating every tap. That was the dead deck all along (v281's 91x0 was a downstream symptom). Fix: the stray line is deleted; the base rule is a plain .swunit again. Harness now asserts the rule at a rule start and the corrupted pattern absent - string-presence checks could not see this. Panel v32 unchanged.
@@ -1627,7 +1628,7 @@
 // follows edges. (Supersedes v15's three-junction
 // main line — in the sketch the fan hangs off one trunk, not the main.)
 var W=540,H=640;
-var VERSION="v286"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
+var VERSION="v287"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
 var DEST=[
  null,
  {n:1,name:"RED ROCK", color:"#e53935"},
@@ -2241,7 +2242,7 @@ function drawHud(){
  for(var i=0;i<3;i++){var bcx=454+i*30,spent=i<S.strikes;
   drawGlyphC(ctx,STRIKEBOX,bcx,57,2,"#e8f5e9");
   ctx.fillStyle=spent?"#e53935":"#1d262b";ctx.fillRect(bcx-4,53,8,8);}
- if(DIFFS[DIFF].next>0)drawPixelText("NEXT",226,36,3,"#a5d6a7","right"); // v220: SUPER hides NEXT entirely
+ if(DIFFS[DIFF].next>0)drawPixelText("NEXT",226,80,3,"#a5d6a7","right"); // v220: SUPER hides NEXT entirely // v287 (Tim): moved down so it cannot overlap the difficulty beside the score
  if(S.queue.length){
   // v216 (Tim): the next three trains that have NOT spawned yet,
   // in equal LARGE boxes reading in spawn order - the NEXT train
