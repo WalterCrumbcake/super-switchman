@@ -60,7 +60,8 @@
 </div>
 <script>
 "use strict";
-// ===== Super Switchman v284 (PWA build) =====
+// ===== Super Switchman v285 (PWA build) =====
+// v285 (Tim): version on the title screen, bottom left - "V285" in the (C) line's type and color on its baseline, drawn from a single VERSION constant the harness ties to this header so they can never drift. Carries v284 (deck fix) + panel v32.
 // v284: THE DECK BUG, root cause at last (Tim's diag screenshot): every tap on the panel logged as swBtn2. A stray ".startunit" line before the base .swunit rule (an old v186-era edit) made its selector ".startunit .swunit" - a descendant rule that matches nothing - so no unit was ever positioned: every .bzel/.arcade button (position:absolute;inset:0) filled the whole #switchpad, stacked in DOM order with swBtn2 on top eating every tap. That was the dead deck all along (v281's 91x0 was a downstream symptom). Fix: the stray line is deleted; the base rule is a plain .swunit again. Harness now asserts the rule at a rule start and the corrupted pattern absent - string-presence checks could not see this. Panel v32 unchanged.
 // v283 (Tim): panel v32 - built IN LAYERS (Tim: work in layers; next time just ask): background = the pristine v10 plate, untouched (no erasing or inpainting anywhere); labels = a separate transparent layer (panel-layers/) - all five words typeset in Baloo 2 ExtraBold, START/TIME at the 24mm label size (cap 61), ONE/TWO/THREE at the 30mm size (cap 76 = 61 x 30/24 - "30mm vs 24mm, scale the label accordingly"). Discs: reference-circle check on v10 - both smalls already r98-100, no change. Panels v18-v31 superseded. Carries the v281 dead-deck fix.
 // v282 (Tim): panel v18 - the labels are the SAME SIZE at last, measured not eyeballed. Letter-fill heights in the art (flood-extracted): START 95, ONE 90, TWO 89, THREE 94 - but TIME was 76, and the v13 composite had wrapped it in a fat black underlay that made its letters read smaller still. TIME is re-rendered from its clean v7 letterforms, scaled x1.26 to a 92px fill on the family baseline, with the same outline weight as START. Carries the v281 dead-deck fix (buttons fill by inset).
@@ -1624,7 +1625,8 @@
 // turnout arcs, see the buildArc note at the layout); the engine just
 // follows edges. (Supersedes v15's three-junction
 // main line — in the sketch the fan hangs off one trunk, not the main.)
-var W=540,H=640; // vertical arcade screen (v52: height fitted to the moved-up layout)
+var W=540,H=640;
+var VERSION="v285"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
 var DEST=[
  null,
  {n:1,name:"RED ROCK", color:"#e53935"},
@@ -2180,6 +2182,7 @@ function drawTableScreen(){
  if(hsPending&&!hsPending.done)drawPixelText("1 LEFT 2 RIGHT 3 BACK   START OK",W/2,540,2,"#78909c","center");
  else if(Math.floor(ANIM_T*1.4)%2===0)drawPixelText("TAP START",W/2,540,3,"#ffb300","center");
  drawPixelText("(C) 1983 DAISOFT",W/2,606,3,"#78909c","center");
+ drawPixelText(VERSION,10,606,3,"#78909c","left"); // v285 (Tim): version, bottom left
  if(titleBoomT>0){ctx.fillStyle="rgba(255,170,60,"+(titleBoomT*0.85)+")";ctx.fillRect(-24,-24,588,688);var ex=blazeD===0?520:20;for(var bq2=0;bq2<14;bq2++){var ba2=bq2*2.399,bd2=6+((bq2*29)%30)*(0.4-titleBoomT)*2.4;ctx.fillStyle=["#ffb300","#e53935","#ffffff"][bq2%3];ctx.fillRect(ex+Math.cos(ba2)*bd2-4,300+Math.sin(ba2)*bd2-4,5+(bq2%3)*3,5+(bq2%3)*3);}} // v266: the off-screen wreck lets go
  ctx.restore();
 }
@@ -2624,6 +2627,7 @@ function drawStartScreen(){
  drawPixelText("YOU RUN THE SWITCHES NOT THE TRAIN",W/2,482,3,"#a5d6a7","center");
  if(Math.floor(ANIM_T*1.4)%2===0)drawPixelText("TAP START",W/2,540,3,"#ffb300","center");
  drawPixelText("(C) 1983 DAISOFT",W/2,606,3,"#78909c","center");
+ drawPixelText(VERSION,10,606,3,"#78909c","left"); // v285 (Tim): version, bottom left
 }
 // v115 (Tim): NEW END SCREEN to match the rest of the game — GAME OVER in
 // the same pixel-logo treatment (red face, dark extrusion), the score in
