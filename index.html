@@ -60,7 +60,8 @@
 </div>
 <script>
 "use strict";
-// ===== Super Switchman v290 (PWA build) =====
+// ===== Super Switchman v291 (PWA build) =====
+// v291 (Tim): GAME B - a second game in the cabinet, chosen in SERVICE (GAME row). Five tunnels in, three exits out; 5 crossover switches drop trains one line down; ONE/TWO walk the Switchman between posts, THREE throws the switch he mans. Exits have speeds not yards (1 EXPRESS double, 2 CENTRAL, 3 SLOW half); trains collide on shared track; the GHOST train never collides and scores anywhere. Game A untouched; B keeps its own high-score tables. Carries v290.
 // v290 (Tim): the in-game theme is redone as synthwave - CHORDS and FEEL, played by BASS AND PADS alone. The progression is THE synthwave progression, Am F C G (Em C G D retired): TRI pumps the octave 8ths (walking fill kept on the G bar) while SQ2 pads hold the chords root-to-fifth. No arp, no drums in the song - SQ1 speaks only when a switch throws it (the lead sound, off the pattern roots; F takes a major third now). Carries v289.
 // v289 (Tim): the in-game theme is SYNTHWAVE BASS now - same Em C G D march and walking fill, same 130 BPM, but the TRI chug becomes the octave pump (root / root+12 on every 8th), grit eased 0.55 -> 0.3, filter opened 4500 -> 5200. Bass only still; the switches keep triggering the lead sound off the pattern roots, untouched. Carries v288.
 // v288 (Tim): SHOT 3 fixes - the door is SHORTER (frame 262 -> 208 tall, slab 250 -> 196, base still on the ground line) and the blown doorway now spills warm office light instead of pure black, so the Warden stepping out reads SOLID against it instead of dissolving into the dark like a ghost. Carries v287.
@@ -1631,7 +1632,7 @@
 // follows edges. (Supersedes v15's three-junction
 // main line — in the sketch the fan hangs off one trunk, not the main.)
 var W=540,H=640;
-var VERSION="v290"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
+var VERSION="v291"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
 var DEST=[
  null,
  {n:1,name:"RED ROCK", color:"#e53935"},
@@ -1708,7 +1709,7 @@ var S=null;
 function freshState(){
  return {mode:"ready",score:0,combo:0,best:0,strikes:0,delivered:0,level:1,
   sw:[0,0,0],trains:[],spawnT:0.6,queue:[rollDest(),rollDest(),rollDest()],
-  nextId:1,sound:true,time:0,flash:"",switchT:0,switchCD:0,lastTick:0,man:{x:212,y:182,tx:212,ty:182,ph:0,moving:false,throwT:0,say:"",sayT:0}};
+  nextId:1,sound:true,gameB:false,b:null,time:0,flash:"",switchT:0,switchCD:0,lastTick:0,man:{x:212,y:182,tx:212,ty:182,ph:0,moving:false,throwT:0,say:"",sayT:0}};
 }
 var lastDest=0,repeatRun=0;
 // v220 (Tim): DIFFICULTY - easy (trains 50%, no red spawns),
@@ -1899,6 +1900,10 @@ function onPointer(e){
  if(S.mode==="ready"){startGame();return true;}
  if(S.mode==="over"){if(overStartT>=0&&(ANIM_T-overStartT)<4.9){overStartT=ANIM_T-4.9;return true;} toggleStart();return true;} // v270: a canvas tap during the rage film skips to game over as it was; START keeps its classic job
  if(S.mode==="table"){tableTap(p);return true;}
+ if(S.gameB&&S.mode==="run"){ // v291: tap a switch to send the man; tap his own to throw it
+  for(var bi=0;bi<5;bi++){var bdx=p.x-BNODES[BSW[bi].node].x,bdy=p.y-BNODES[BSW[bi].node].y,bsx=p.x-BSW[bi].px,bsy=p.y-BSW[bi].py;
+   if(bdx*bdx+bdy*bdy<=56*56||bsx*bsx+bsy*bsy<=62*62){if(bi===S.b.post)bThrow();else{S.b.post=bi;S.man.tx=BSW[bi].sx;S.man.ty=BSW[bi].sy;beep(600+bi*40,0.05,"square",0.03);}return true;}}
+  return false;}
  for(var i=0;i<3;i++){
   var dx=p.x-LEVERS[i].x,dy=p.y-LEVERS[i].y;
   if(dx*dx+dy*dy<=62*62)return flipSwitch(i);          // lever: big finger target
@@ -1913,7 +1918,8 @@ window.addEventListener("keydown",function(e){
  if(svcOpen){if(e.key==="1")svcNav(-1);else if(e.key==="2")svcNav(1);else if(e.key==="3"||e.key==="Escape")closeService();else if(e.key==="Enter")svcActivate();else if(e.key===" "){e.preventDefault();svcActivate();}return;} // v218
  if(e.key==="1")keyDown1=true;
  if(S.mode==="table"){if(e.key==="1")tableInput(0);else if(e.key==="2")tableInput(1);else if(e.key==="3"||e.key==="Backspace")tableInput(2);else if(e.key==="Enter")tableConfirm();else if(/^[a-zA-Z]$/.test(e.key)&&hsPending&&!hsPending.done){hsPending.chars[hsPending.pos]=e.key.toUpperCase();beep(760,0.05,"square",0.04);}else if(e.key===" "){e.preventDefault();if(hsPending&&!hsPending.done)tableConfirm();else toggleStart();}return;}
- if(e.key==="1")flipSwitch(0,-1);
+ if(S.gameB&&S.mode==="run"){if(e.key==="1")bControl(0);else if(e.key==="2")bControl(1);else if(e.key==="3")bControl(2);}
+ else if(e.key==="1")flipSwitch(0,-1);
  else if(e.key==="2")flipSwitch(1,-1);
  else if(e.key==="3")flipSwitch(2,-1);
  else if(e.key===" "){e.preventDefault();toggleStart();}
@@ -1924,7 +1930,7 @@ window.addEventListener("keyup",function(e){ // v256: key release ends held flip
  if(e.key==="3"){flipNoteRelease();}
 });
 function startGame(){overStartT=-1;readyT0=-1;tableT0=-1; // v122: re-arm the end-screen clock
- var keepSound=S.sound;S=freshState();S.sound=keepSound;S.mode="run";
+ var keepSound=S.sound;S=freshState();S.sound=keepSound;S.mode="run";if(svc.game==="B"){S.gameB=true;bInit();} // v291: GAME B
 }
 // v123 (Tim): START no longer pauses — it fires SWITCHTIME: the trains
 // freeze for 3 seconds while you throw switches freely. 10s cooldown
@@ -2086,6 +2092,7 @@ el.swb.forEach(function(b,i){
   padSwBefore[i]=S.sw[i];padFired[i]=true;
   if(svcOpen){svcInput(i);return;}
   if(S.mode==="table"){tableInput(i);return;}
+  if(S.gameB&&S.mode==="run"){bControl(i);return;} // v291: Game B panel - move the man / throw his switch
   flipSwitch(i,-1);});
  b.addEventListener("pointerup",function(){padDown[i]=false;if(flipVoice&&flipVoice.btn===i)flipNoteRelease();});
  b.addEventListener("pointerleave",function(){padDown[i]=false;if(flipVoice&&flipVoice.btn===i)flipNoteRelease();});
@@ -2099,7 +2106,7 @@ el.start.addEventListener("click",function(){if(startFired){startFired=false;ret
 // over 0 that beats the #10 (or fills an empty seat) earns an
 // initials entry - buttons 1/2 pick the letter, 3 enters it.
 var HSKEY="ssHighScores10";
-function hsKey(){return DIFF==="normal"?"ssHighScores10":"ssHighScores10_"+DIFF;} // v220: one table per difficulty; NORMAL keeps the original key so existing scores survive
+function hsKey(){var gB=(typeof svc!=="undefined"&&svc&&svc.game==="B"),base=gB?"ssHighScores10B":"ssHighScores10";return DIFF==="normal"?base:base+"_"+DIFF;} // v220: one table per difficulty; NORMAL keeps the original key so existing scores survive // v291: Game B keeps its own tables
 var highScores=loadHS(),hsPending=null;
 var readyT0=-1; // v196: attract-cycle anchor (ANIM_T when the title screen came up)
 var tableT0=-1; // v198: idle anchor for the post-game table (re-anchored when the entry finishes)
@@ -2112,10 +2119,10 @@ var MARQUEES=["data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBA
 var MARQNAMES=["ATARI","1983","STORY","SLAB"];
 var svc=loadSvc();DIFF=svc.diff; // v220: boot into the saved difficulty
 var SPEEDS=[0.5,0.75,1,1.25,1.5,2],SPEEDLBL=["50%","75%","100%","125%","150%","200%"]; // v219: game speed steps
-function loadSvc(){var d={crt:true,scan:true,sound:true,spd:2,diff:"normal",marq:0};try{var a=JSON.parse(localStorage.getItem("ssService1")||"null");if(a){if(typeof a.crt==="boolean")d.crt=a.crt;if(typeof a.scan==="boolean")d.scan=a.scan;if(typeof a.sound==="boolean")d.sound=a.sound;if(Number.isInteger(a.spd)&&a.spd>=0&&a.spd<6)d.spd=a.spd;if(typeof a.diff==="string"&&DIFFS[a.diff])d.diff=a.diff;if(Number.isInteger(a.marq)&&a.marq>=0&&a.marq<4)d.marq=a.marq;}}catch(e){}return d;}
+function loadSvc(){var d={crt:true,scan:true,sound:true,spd:2,diff:"normal",marq:0,game:"A"};try{var a=JSON.parse(localStorage.getItem("ssService1")||"null");if(a){if(typeof a.crt==="boolean")d.crt=a.crt;if(typeof a.scan==="boolean")d.scan=a.scan;if(typeof a.sound==="boolean")d.sound=a.sound;if(Number.isInteger(a.spd)&&a.spd>=0&&a.spd<6)d.spd=a.spd;if(typeof a.diff==="string"&&DIFFS[a.diff])d.diff=a.diff;if(Number.isInteger(a.marq)&&a.marq>=0&&a.marq<4)d.marq=a.marq;if(a.game==="A"||a.game==="B")d.game=a.game;}}catch(e){}return d;}
 function saveSvc(){try{localStorage.setItem("ssService1",JSON.stringify(svc));}catch(e){}}
 var svcOpen=false,svcCur=0,svcArm=false,svcEat=[false,false,false],padDown=[false,false,false],padFired=[false,false,false],padSwBefore=[0,0,0],startFired=false,keyDown1=false,key3Down=false,key3Combo=false;
-var SVC_ROWS=9,SVC_Y0=192,SVC_DY=38;
+var SVC_ROWS=10,SVC_Y0=192,SVC_DY=38; // v291: GAME row added
 var svcSndIdx=0,SNDTEST=[sndFlip,sndLock,sndGood,sndBad,sndSwitchtime,sndTick],SNDNAMES=["FLIP","LOCKED","GOOD","BAD","SWITCHTIME","TICK"]; // v222: sound test playlist
 function applySvc(){var mi=document.getElementById("marqimg");if(mi)mi.src=MARQUEES[svc.marq];if(glowEl)glowEl.style.display=svc.crt?"":"none";if(scanEl)scanEl.style.display=svc.scan?"":"none";S.sound=svc.sound;}
 function openService(){svcOpen=true;svcCur=0;svcArm=false;beep(990,0.07,"square",0.05);beep(1320,0.09,"square",0.05,0.07);}
@@ -2128,19 +2135,20 @@ function svcActivate(){
  else if(svcCur===2){if(svc.sound){beep(880,0.05,"square",0.05);svc.sound=false;applySvc();}else{svc.sound=true;S.sound=true;beep(1180,0.06,"square",0.05);applySvc();}saveSvc();}
  else if(svcCur===3){svc.spd=(svc.spd+1)%SPEEDS.length;saveSvc();beep(880+svc.spd*60,0.05,"square",0.045);}
  else if(svcCur===4){var nd=DIFFORDER[(DIFFORDER.indexOf(DIFF)+1)%4];DIFF=nd;svc.diff=nd;highScores=loadHS();if(hsPending&&!hsPending.done)hsPending=null;saveSvc();beep(990,0.05,"square",0.045);}
- else if(svcCur===5){var keepSnd=S.sound;S.sound=true;SNDTEST[svcSndIdx]();S.sound=svc.sound;svcSndIdx=(svcSndIdx+1)%SNDTEST.length;} // v222: sound test auditions even with sound off
- else if(svcCur===6){if(!svcArm){svcArm=true;beep(440,0.07,"square",0.05);}else{highScores=[];saveHS();svcArm=false;beep(1180,0.06,"square",0.05);beep(1560,0.09,"square",0.05,0.07);}}
- else if(svcCur===7){svc.marq=(svc.marq+1)%MARQUEES.length;applySvc();saveSvc();beep(880+svc.marq*80,0.05,"square",0.045);}
+ else if(svcCur===5){svc.game=svc.game==="A"?"B":"A";highScores=loadHS();if(hsPending&&!hsPending.done)hsPending=null;saveSvc();beep(svc.game==="B"?1180:740,0.06,"square",0.05);} // v291: GAME A/B - each game keeps its own tables
+ else if(svcCur===6){var keepSnd=S.sound;S.sound=true;SNDTEST[svcSndIdx]();S.sound=svc.sound;svcSndIdx=(svcSndIdx+1)%SNDTEST.length;} // v222: sound test auditions even with sound off
+ else if(svcCur===7){if(!svcArm){svcArm=true;beep(440,0.07,"square",0.05);}else{highScores=[];saveHS();svcArm=false;beep(1180,0.06,"square",0.05);beep(1560,0.09,"square",0.05,0.07);}}
+ else if(svcCur===8){svc.marq=(svc.marq+1)%MARQUEES.length;applySvc();saveSvc();beep(880+svc.marq*80,0.05,"square",0.045);}
  else closeService();
 }
 function svcTap(y){var r=Math.round((y-SVC_Y0)/SVC_DY);if(r<0||r>=SVC_ROWS)return;if(r!==svcCur){svcCur=r;svcArm=false;}svcActivate();}
 function drawService(){
  ctx.fillStyle="rgba(0,0,0,0.86)";ctx.fillRect(0,0,W,H);
  drawPixelText("SERVICE MENU",W/2,120,5,"#fdd835","center");
- var labels=["CRT EFFECT","SCANLINES","SOUND","GAME SPEED","DIFFICULTY","SOUND TEST","RESET SCORES","MARQUEE","DONE"],vals=[svc.crt,svc.scan,svc.sound,SPEEDLBL[svc.spd],svc.diff.toUpperCase(),SNDNAMES[svcSndIdx],null,MARQNAMES[svc.marq],null];
+ var labels=["CRT EFFECT","SCANLINES","SOUND","GAME SPEED","DIFFICULTY","GAME","SOUND TEST","RESET SCORES","MARQUEE","DONE"],vals=[svc.crt,svc.scan,svc.sound,SPEEDLBL[svc.spd],svc.diff.toUpperCase(),svc.game,SNDNAMES[svcSndIdx],null,MARQNAMES[svc.marq],null];
  for(var r=0;r<SVC_ROWS;r++){var y=SVC_Y0+r*SVC_DY,hot=r===svcCur;
   if(hot){ctx.fillStyle="#fdd835";ctx.fillRect(72,y-9,12,18);}
-  if(r===6&&svcArm)drawPixelText("ARE YOU SURE?",110,y,3,"#e53935","left");
+  if(r===7&&svcArm)drawPixelText("ARE YOU SURE?",110,y,3,"#e53935","left");
   else drawPixelText(labels[r],110,y,3,hot?"#fdd835":"#e8f5e9","left");
   if(vals[r]!==null)drawPixelText(typeof vals[r]==="string"?vals[r]:(vals[r]?"ON":"OFF"),430,y,3,typeof vals[r]==="string"?"#e8f5e9":(vals[r]?"#43d854":"#78909c"),"right");
  }
@@ -2175,7 +2183,7 @@ function drawTableScreen(){
  ctx.fillStyle="#000";ctx.fillRect(0,0,W,H);
  drawPixelText("HIGH SCORES",W/2+3,83,6,"#bf360c","center");
  drawPixelText("HIGH SCORES",W/2,80,6,"#fdd835","center");
- drawPixelText(DIFF,W/2,116,2,DIFFS[DIFF].lbl,"center"); // v220: whose table this is
+ drawPixelText(DIFF+(svc.game==="B"?" - GAME B":""),W/2,116,2,DIFFS[DIFF].lbl,"center"); // v220: whose table this is // v291: and which game
  var rows=displayRows(),rev=tableReveal();
  for(var r=0;r<rows.length;r++){if(r>=rev&&!rows[r].hot)continue; // v205 (Tim): reveal one at a time; your own row is never held back
   var y=150+r*33,row=rows[r],col=row.hot?"#fdd835":(row.fill?"#78909c":"#e8f5e9");
@@ -2191,6 +2199,250 @@ function drawTableScreen(){
  if(titleBoomT>0){ctx.fillStyle="rgba(255,170,60,"+(titleBoomT*0.85)+")";ctx.fillRect(-24,-24,588,688);var ex=blazeD===0?520:20;for(var bq2=0;bq2<14;bq2++){var ba2=bq2*2.399,bd2=6+((bq2*29)%30)*(0.4-titleBoomT)*2.4;ctx.fillStyle=["#ffb300","#e53935","#ffffff"][bq2%3];ctx.fillRect(ex+Math.cos(ba2)*bd2-4,300+Math.sin(ba2)*bd2-4,5+(bq2%3)*3,5+(bq2%3)*3);}} // v266: the off-screen wreck lets go
  ctx.restore();
 }
+// ===== v291: GAME B (Tim) - five tunnels in, three exits out =====
+// 5 entrances feed 3 through-lines (one per exit); 5 crossover switches
+// each drop a train ONE line down. ONE/TWO move the Switchman between
+// posts, THREE throws the switch he mans. Exits have speeds, not yards:
+// line 1 EXPRESS (double speed), line 2 CENTRAL, line 3 SLOW (half).
+// Trains name the exit they want; wrong exit = strike; TRAINS COLLIDE
+// on shared track - except the GHOST train, the wildcard, which never
+// collides and scores at any exit.
+var BDEST=[null,{n:1,name:"EXPRESS",color:"#fdd835"},{n:2,name:"CENTRAL",color:"#1e88e5"},{n:3,name:"SLOW",color:"#43a047"}];
+var BNODES={
+ be1:{x:-10,y:150,ln:0,to:"be1a"},be1a:{x:45,y:178,ln:0,to:"bm1"},bm1:{x:100,y:200,ln:1,to:"bs1"},
+ bs1:{x:140,y:200,ln:1,sw:0,thru:"bn1a",br:"bc1b"},bn1a:{x:245,y:200,ln:1,to:"bs3"},
+ bs3:{x:300,y:200,ln:1,sw:2,thru:"bn1b",br:"bc3b"},bn1b:{x:385,y:200,ln:1,to:"bs5"},
+ bs5:{x:445,y:200,ln:1,sw:4,thru:"bx1",br:"bc5b"},bx1:{x:556,y:200,ln:1,term:1},
+ be2:{x:-10,y:260,ln:0,to:"be2a"},be2a:{x:50,y:292,ln:0,to:"bm2"},
+ be3:{x:-10,y:320,ln:0,to:"be3a"},be3a:{x:45,y:320,ln:0,to:"bm2"},bm2:{x:110,y:320,ln:2,to:"bs2"},
+ bs2:{x:215,y:320,ln:2,sw:1,thru:"bc1b",br:"bc2b"},bc1b:{x:245,y:320,ln:2,to:"bn2a"},bn2a:{x:330,y:320,ln:2,to:"bs4"},
+ bs4:{x:375,y:320,ln:2,sw:3,thru:"bc3b",br:"bc4b"},bc3b:{x:405,y:320,ln:2,to:"bn2b"},bn2b:{x:470,y:320,ln:2,to:"bc5b"},
+ bc5b:{x:538,y:320,ln:2,to:"bx2"},bx2:{x:556,y:320,ln:2,term:2},
+ be4:{x:-10,y:385,ln:0,to:"be4a"},be4a:{x:50,y:414,ln:0,to:"bm3"},
+ be5:{x:-10,y:440,ln:0,to:"be5a"},be5a:{x:45,y:440,ln:0,to:"bm3"},bm3:{x:105,y:440,ln:3,to:"bc2b"},
+ bc2b:{x:320,y:440,ln:3,to:"bc4b"},bc4b:{x:480,y:440,ln:3,to:"bx3"},bx3:{x:556,y:440,ln:3,term:3}
+};
+var BEDGES=[["be1","be1a"],["be1a","bm1"],["bm1","bs1"],["bs1","bn1a"],["bs1","bc1b"],["bn1a","bs3"],["bs3","bn1b"],["bs3","bc3b"],["bn1b","bs5"],["bs5","bx1"],["bs5","bc5b"],
+ ["be2","be2a"],["be2a","bm2"],["be3","be3a"],["be3a","bm2"],["bm2","bs2"],["bs2","bc1b"],["bs2","bc2b"],["bc1b","bn2a"],["bn2a","bs4"],["bs4","bc3b"],["bs4","bc4b"],["bc3b","bn2b"],["bn2b","bc5b"],["bc5b","bx2"],
+ ["be4","be4a"],["be4a","bm3"],["be5","be5a"],["be5a","bm3"],["bm3","bc2b"],["bc2b","bc4b"],["bc4b","bx3"]];
+// switch furniture: node, signal plate centre, Switchman stand
+var BSW=[{node:"bs1",px:140,py:164,sx:140,sy:232},{node:"bs2",px:215,py:356,sx:185,sy:282},
+ {node:"bs3",px:300,py:164,sx:300,sy:232},{node:"bs4",px:375,py:356,sx:345,sy:282},
+ {node:"bs5",px:445,py:164,sx:445,sy:232}];
+var BREACH={0:[1,2,3],1:[2,3],2:[2,3],3:[3],4:[3]}; // exits each entrance can reach
+function bNext(id){
+ var n=BNODES[id];if(!n)return null;
+ if(n.sw!==undefined)return S.b.swB[n.sw]===0?n.thru:n.br;
+ return n.to||null;
+}
+function rollB(){
+ if(Math.random()<0.07)return {e:Math.floor(Math.random()*5),d:0}; // the GHOST - any entrance, any exit
+ var r=Math.random(),d=r<0.25?1:(r<0.60?2:3);
+ var pool=d===1?[0]:(d===2?[0,1,2]:[0,1,2,3,4]);
+ return {e:pool[Math.floor(Math.random()*pool.length)],d:d};
+}
+function bInit(){
+ S.b={swB:[0,0,0,0,0],post:0,trains:[],queue:[],spawnT:0.8,booms:[]};
+ for(var i=0;i<3;i++)S.b.queue.push(rollB());
+ S.man.x=S.man.tx=BSW[0].sx;S.man.y=S.man.ty=BSW[0].sy;
+}
+function bSpawn(item){
+ var from="be"+(item.e+1),to=bNext(from);
+ var t={id:S.nextId++,dest:item.d,e:item.e,from:from,to:to,dist:0,len:segLen(BNODES[from],BNODES[to]),
+        travel:0,hist:[],hx:BNODES[from].x,hy:BNODES[from].y,dead:false};
+ t.hist.push({x:t.hx,y:t.hy,travel:0});
+ S.b.trains.push(t);return t;
+}
+function bLineMult(id){var ln=BNODES[id].ln;return ln===1?2:(ln===3?0.5:1);} // EXPRESS line doubles, SLOW line halves
+function arriveB(t,nodeId){
+ var term=BNODES[nodeId].term;
+ if(t.dest===0||term===t.dest){ // the ghost scores at ANY exit
+  S.combo++;S.delivered++;
+  var pts=100+Math.min(S.combo-1,10)*10;
+  if(S.combo%5===0)pts+=250;
+  S.score+=pts;S.level=1+Math.floor(S.delivered/5);
+  sndGood();
+ }else{
+  S.strikes++;S.combo=0;
+  sndBad();manSay("@&#%!");
+  if(S.strikes>=3)S.mode="over";
+ }
+}
+function bStepTrain(t,dt){
+ var sp=trainSpeed()*bLineMult(t.from);
+ t.dist+=sp*dt;t.travel+=sp*dt;
+ var guard=0;
+ while(t.dist>=t.len&&guard++<6){
+  var over=t.dist-t.len,arrivedNode=t.to;
+  if(BNODES[arrivedNode].term){arriveB(t,arrivedNode);t.dead=true;t.hx=BNODES[arrivedNode].x;t.hy=BNODES[arrivedNode].y;return;}
+  t.from=arrivedNode;t.to=bNext(t.from);t.dist=over;
+  t.len=segLen(BNODES[t.from],BNODES[t.to]);
+ }
+ var a=BNODES[t.from],b=BNODES[t.to],k=t.len?t.dist/t.len:0;
+ t.hx=a.x+(b.x-a.x)*k;t.hy=a.y+(b.y-a.y)*k;
+ var last=t.hist[t.hist.length-1];
+ if(!last||Math.abs(t.hx-last.x)+Math.abs(t.hy-last.y)>2.5)t.hist.push({x:t.hx,y:t.hy,travel:t.travel});
+ if(t.hist.length>400)t.hist.splice(0,t.hist.length-400);
+}
+function bCollide(){
+ var ts=S.b.trains;
+ for(var i=0;i<ts.length;i++)for(var j=i+1;j<ts.length;j++){
+  var a=ts[i],b=ts[j];
+  if(a.dead||b.dead||a.dest===0||b.dest===0)continue; // a ghost never collides
+  var crash=false;
+  if(a.from===b.from&&a.to===b.to){if(Math.abs(a.dist-b.dist)<118)crash=true;}
+  if(!crash){
+   var dx=a.hx-b.hx,dy=a.hy-b.hy;
+   if(dx*dx+dy*dy<26*26)crash=true;
+   else{var ta=posAt(a,a.travel-118),tb=posAt(b,b.travel-118);
+    var d1=(a.hx-tb.x)*(a.hx-tb.x)+(a.hy-tb.y)*(a.hy-tb.y),d2=(b.hx-ta.x)*(b.hx-ta.x)+(b.hy-ta.y)*(b.hy-ta.y);
+    if(d1<18*18||d2<18*18)crash=true;}
+  }
+  if(crash){
+   a.dead=true;b.dead=true;
+   S.b.booms.push({x:(a.hx+b.hx)/2,y:(a.hy+b.hy)/2,t:0.6});
+   S.strikes++;S.combo=0;sndBad();manSay("@&#%!");
+   if(S.strikes>=3)S.mode="over";
+   return; // one wreck per frame is enough
+  }
+ }
+}
+function bStep(dt){
+ var B=S.b;
+ B.spawnT-=dt;
+ if(B.spawnT<=0){
+  var item=B.queue[0],clear=true;
+  for(var k=0;k<B.trains.length;k++)if(B.trains[k].e===item.e&&B.trains[k].travel<170)clear=false;
+  if(clear){B.queue.shift();B.queue.push(rollB());bSpawn(item);B.spawnT=spawnInterval();}
+  else B.spawnT=0.25;
+ }
+ for(var i=B.trains.length-1;i>=0;i--){bStepTrain(B.trains[i],dt);if(B.trains[i].dead)B.trains.splice(i,1);}
+ bCollide();
+ for(var q=B.trains.length-1;q>=0;q--)if(B.trains[q].dead)B.trains.splice(q,1);
+ for(var z=B.booms.length-1;z>=0;z--){B.booms[z].t-=dt;if(B.booms[z].t<=0)B.booms.splice(z,1);}
+}
+function bLocked(i){
+ if(S.switchT>0)return false; // SWITCHTIME lifts the locks
+ var nodeId=BSW[i].node;
+ for(var k=0;k<S.b.trains.length;k++){var t=S.b.trains[k];
+  if(t.from===nodeId&&t.dist<90)return true;}
+ return false;
+}
+function bMove(d){
+ var np=Math.max(0,Math.min(4,S.b.post+d));
+ if(np===S.b.post){sndLock();return;}
+ S.b.post=np;S.man.tx=BSW[np].sx;S.man.ty=BSW[np].sy;
+ beep(600+np*40,0.05,"square",0.03);
+}
+function bThrow(){
+ var i=S.b.post,m=S.man;
+ if(m.moving||Math.abs(m.x-BSW[i].sx)>4||Math.abs(m.y-BSW[i].sy)>4){sndLock();return;} // he throws only the switch he mans
+ if(bLocked(i)){sndLock();return;}
+ S.b.swB[i]=S.b.swB[i]===0?1:0;m.throwT=0.5;sndFlip(2,0.25);
+}
+function bControl(i){ // Game B panel: ONE back a post, TWO forward a post, THREE throw
+ if(i===0)bMove(-1);else if(i===1)bMove(1);else bThrow();
+}
+function drawTrackEdgeB(x1,y1,x2,y2){
+ var dx=x2-x1,dy=y2-y1,L=Math.sqrt(dx*dx+dy*dy),ux=dx/L,uy=dy/L,px=-uy,py=ux,INK="#b0bec5";
+ var d=tieCarry;
+ while(d<L-2){
+  if(d>=0){var x=x1+ux*d,y=y1+uy*d;
+   ctx.fillStyle=INK;
+   ctx.fillRect(x-px*7-2,y-py*7-2,4,4);ctx.fillRect(x-2,y-2,4,4);ctx.fillRect(x+px*7-2,y+py*7-2,4,4);}
+  d+=13;
+ }
+ tieCarry=d-L;
+ [-4.5,4.5].forEach(function(o){drawPixelLine(x1+px*o,y1+py*o,x2+px*o,y2+py*o,3,3,INK);});
+}
+function drawSignalsB(){
+ for(var i=0;i<5;i++){
+  var sw=BSW[i],node=BNODES[sw.node],locked=bLocked(i);
+  // white route highlight, ~90px along the chosen route
+  var hx=node.x,hy=node.y,rem=90,hid=sw.node,hg=0;
+  while(rem>0&&hg++<10){
+   var hn=bNext(hid);if(!hn)break;
+   var hp=BNODES[hn],hdx=hp.x-hx,hdy=hp.y-hy,hL=Math.sqrt(hdx*hdx+hdy*hdy)||1,hd=Math.min(rem,hL);
+   drawPixelLine(hx,hy,hx+hdx/hL*hd,hy+hdy/hL*hd,4,5,"#ffffff");
+   hx+=hdx/hL*hd;hy+=hdy/hL*hd;rem-=hd;hid=hn;
+  }
+  drawPixelLine(node.x,node.y,sw.px,sw.py,5,3,"#37474f");
+  ctx.fillStyle="#90a4ae";ctx.fillRect(node.x-4,node.y-4,9,9);
+  ctx.fillStyle="#05070a";
+  ctx.fillRect(sw.px-36,sw.py-20,72,40);
+  ctx.fillRect(sw.px-40,sw.py-16,80,32);
+  drawDigit(i+1,sw.px-18,sw.py,2.5,"#ffffff");
+  var grn=(S.b.swB[i]===0),bg=ARROWS["D"].on;
+  var bp=grn?[null,"#43d854",null,"#ff0000"]:[null,"#e53935",null,"#43d854"];
+  drawGlyphC(ctx,bg,sw.px+16,sw.py,2,bp);
+  if(locked&&Math.floor(ANIM_T*2.4)%2===0){
+   var aw=bg[0].length*2,ah=bg.length*2;
+   ctx.strokeStyle="#ff1744";ctx.lineWidth=3;
+   ctx.strokeRect(sw.px+16-aw/2-4,sw.py-ah/2-4,aw+8,ah+8);
+  }
+  if(S.b.post===i){ // the manned post wears gold corners
+   ctx.strokeStyle="#fdd835";ctx.lineWidth=3;
+   var gx=sw.px-44,gy=sw.py-24,gw=88,gh=48;
+   ctx.beginPath();
+   ctx.moveTo(gx,gy+10);ctx.lineTo(gx,gy);ctx.lineTo(gx+10,gy);
+   ctx.moveTo(gx+gw-10,gy);ctx.lineTo(gx+gw,gy);ctx.lineTo(gx+gw,gy+10);
+   ctx.moveTo(gx+gw,gy+gh-10);ctx.lineTo(gx+gw,gy+gh);ctx.lineTo(gx+gw-10,gy+gh);
+   ctx.moveTo(gx+10,gy+gh);ctx.lineTo(gx,gy+gh);ctx.lineTo(gx,gy+gh-10);
+   ctx.stroke();
+  }
+ }
+}
+function posBackB(t,back){ // posBack with the B graph for the facing fallback
+ var target=t.travel-back;
+ var pos=posAt(t,target),behind=posAt(t,target-24);
+ var ang=Math.atan2(pos.y-behind.y,pos.x-behind.x);
+ if(pos.x===behind.x&&pos.y===behind.y)ang=Math.atan2(BNODES[t.to].y-pos.y,BNODES[t.to].x-pos.x);
+ return {x:pos.x,y:pos.y,ang:ang};
+}
+function drawTrainsB(){
+ for(var i=0;i<S.b.trains.length;i++){var t=S.b.trains[i];
+  var c=t.dest===0?(Math.floor(ANIM_T*5)%2?"#f5f5f5":"#90a4ae"):BDEST[t.dest].color; // the ghost flickers pale
+  var p2=posBackB(t,112),p1=posBackB(t,56),p0=posBackB(t,0);
+  drawCar(p2.x,p2.y,p2.ang,c,false,t.dest);
+  drawCar(p1.x,p1.y,p1.ang,c,false,t.dest);
+  drawCar(p0.x,p0.y,p0.ang,c,true,t.dest);
+ }
+}
+function drawBoardB(){
+ // tunnel mouths (black) under the track; colored caps over it later
+ var ei,ex;
+ for(ei=0;ei<5;ei++){var en=BNODES["be"+(ei+1)];ctx.fillStyle="#000";ctx.fillRect(-8,en.y-17,30,34);}
+ for(ex=1;ex<=3;ex++){var xn=BNODES["bx"+ex];ctx.fillStyle="#000";ctx.fillRect(518,xn.y-17,30,34);}
+ tieCarry=6;
+ for(var e=0;e<BEDGES.length;e++){var A=BNODES[BEDGES[e][0]],B=BNODES[BEDGES[e][1]];drawTrackEdgeB(A.x,A.y,B.x,B.y);}
+ drawSignalsB();
+ drawMan(S.man.x,S.man.y,2.2,S.man.moving,S.man.ph,S.man.throwT);
+ drawTrainsB();
+ for(ex=1;ex<=3;ex++){var xn2=BNODES["bx"+ex];
+  ctx.fillStyle=BDEST[ex].color;ctx.fillRect(518,xn2.y-21,30,7);
+  drawPixelText(ex+" "+BDEST[ex].name,532,xn2.y+30,2,"#a5d6a7","center");}
+ for(var bq=0;bq<S.b.booms.length;bq++){var bo=S.b.booms[bq],r=(0.6-bo.t)*46;
+  ctx.fillStyle=bo.t>0.3?"#ffb300":"#e53935";
+  ctx.fillRect(bo.x-r,bo.y-3,r*2,6);ctx.fillRect(bo.x-3,bo.y-r,6,r*2);}
+}
+function drawHudB(){
+ var scw=drawPixelText("SCORE "+S.score,12,39,3,"#e8f5e9","left");
+ drawPixelText(DIFF,26+scw,39,3,DIFFS[DIFF].lbl,"left");
+ drawPixelText("GAME B",13,74,3,"#fdd835","left");
+ drawPixelText("COMBO X"+S.combo+" LV "+S.level,120,74,3,S.combo>=2?"#ffb300":"#7fae74","left");
+ drawPixelText("STRIKES",442,33,3,"#a5d6a7","left");
+ for(var i=0;i<3;i++){var bcx=454+i*30,spent=i<S.strikes;
+  drawGlyphC(ctx,STRIKEBOX,bcx,57,2,"#e8f5e9");
+  ctx.fillStyle=spent?"#e53935":"#1d262b";ctx.fillRect(bcx-4,53,8,8);}
+ if(DIFFS[DIFF].next>0)drawPixelText("NEXT",226,80,3,"#a5d6a7","right");
+ var n3=Math.min(DIFFS[DIFF].next,S.b.queue.length);
+ for(var q=0;q<n3;q++){var it=S.b.queue[q],cx2=265+q*66;
+  drawGlyphC(ctx,CHIPBOX,cx2,54,3.5,"#ffffff");
+  if(it.d===0){ctx.fillStyle=Math.floor(ANIM_T*5)%2?"#f5f5f5":"#90a4ae";ctx.fillRect(cx2-10,44,20,20);}
+  else drawDigit(it.d,cx2,54,4,BDEST[it.d].color);
+ }
+}
+
 // ===== update =====
 function step(dt){
  if(S.mode!=="run")return;
@@ -2207,6 +2459,7 @@ function step(dt){
  // the Switchman still runs and throws during the freeze (man block is
  // below); trains and spawns wait until the freeze is over
  if(S.switchT<=0){
+ if(S.gameB){bStep(dt);}else{
  // spawn only once the entry is clear by a full train length + gap
  S.spawnT-=dt;
  if(S.spawnT<=0){
@@ -2216,6 +2469,7 @@ function step(dt){
   else S.spawnT=0.25;
  }
  for(var i=S.trains.length-1;i>=0;i--){stepTrain(S.trains[i],dt);if(S.trains[i].dead)S.trains.splice(i,1);}
+ }
  } // v123: end of the not-frozen section
  // v92: the SWITCHMAN hurries to the switch you just threw
  (function(){var m=S.man,dx=m.tx-m.x,dy=m.ty-m.y,d=Math.sqrt(dx*dx+dy*dy);
@@ -2630,6 +2884,7 @@ function drawStartScreen(){
  if(titleSwearT>0){titleSwearT-=1/60;ctx.fillStyle="#ffffff";ctx.fillRect(150,208,106,34);ctx.fillRect(188,242,10,8);ctx.strokeStyle="#111111";ctx.lineWidth=2;ctx.strokeRect(150,208,106,34);drawPixelText("@&#%!",203,218,3,"#111111","center");} // v266: his signature swear, title edition
  drawPixelText("ROUTE EVERY TRAIN TO ITS OWN COLOR",W/2,448,3,"#a5d6a7","center");
  drawPixelText("YOU RUN THE SWITCHES NOT THE TRAIN",W/2,482,3,"#a5d6a7","center");
+ if(svc.game==="B")drawPixelText("GAME B - FIVE TUNNELS THREE EXITS",W/2,512,3,"#fdd835","center"); // v291
  if(Math.floor(ANIM_T*1.4)%2===0)drawPixelText("TAP START",W/2,540,3,"#ffb300","center");
  drawPixelText("(C) 1983 DAISOFT",W/2,606,3,"#78909c","center");
  drawPixelText(VERSION,10,606,3,"#78909c","left"); // v285 (Tim): version, bottom left
@@ -2756,6 +3011,7 @@ function draw(){
  // ground: solid dark green, nothing else (Tim v21: the random dots are gone)
  ctx.fillStyle="#000";ctx.fillRect(-10,-10,W+20,H+20);
  // entry label
+ if(S.gameB&&S.mode==="run"){drawBoardB();}else{
  drawTunnelMouths(); // v53 (Tim): the black part goes BELOW the tracks
  tieCarry=6;
  for(var e=0;e<EDGES.length;e++)drawTrackEdge(EDGES[e][0],EDGES[e][1]);
@@ -2764,6 +3020,7 @@ function draw(){
  if(S.mode!=="ready")drawMan(S.man.x,S.man.y,2.2,S.man.moving,S.man.ph,S.man.throwT);
  drawTrains();
  drawTunnelRoofs(); // v53 (Tim): the colored roof goes ABOVE the trains
+ }
  // v108: the Switchman's BIG speech bubble — reserved for wrong-yard swearing
  if(S.man.sayT>0&&S.mode!=="ready"){
   var txt=S.man.say,cell=4,tw=txt.length*4*cell-cell;
@@ -2777,11 +3034,11 @@ function draw(){
   ctx.fill();ctx.stroke();
   drawPixelText(txt,x0+bw/2,y0+bh/2,cell,"#111","center");
  }
- drawHud();
+ if(S.gameB&&S.mode==="run")drawHudB();else drawHud();
  // v123: the SWITCHTIME timer sprite — pops in the empty west field
  if(S.mode==="run"&&S.switchT>0){
-  drawPixelText("SWITCHTIME",101,158,2,"#ffb300","center"); // v134: Tim's layout — the watch moved up-left
-  var SWFI=Math.min(3,Math.floor((3-S.switchT)/0.75));drawGlyphC(ctx,STOPWATCH_FRAMES[SWFI],101,243,7,STOPWATCH_PALS[SWFI]) // v153: the watch steps one frame per 0.75s of the freeze; // v127 (Tim): white stopwatch behind the countdown; the drain bar is gone
+  drawPixelText("SWITCHTIME",S.gameB?470:101,S.gameB?492:158,2,"#ffb300","center"); // v134: Tim's layout — the watch moved up-left // v291: in Game B it parks bottom-right, clear of the lines
+  var SWFI=Math.min(3,Math.floor((3-S.switchT)/0.75));drawGlyphC(ctx,STOPWATCH_FRAMES[SWFI],S.gameB?470:101,S.gameB?572:243,7,STOPWATCH_PALS[SWFI]) // v153: the watch steps one frame per 0.75s of the freeze; // v127 (Tim): white stopwatch behind the countdown; the drain bar is gone
   // v157 (Tim): countdown digit overlay REMOVED - the sweeping stopwatch hand is the timer now.
  }
  if(S.mode==="intro"){drawIntro();} // v242: the epic intro cinematic
@@ -3030,7 +3287,7 @@ requestAnimationFrame(frame);
 // harness hooks: the real handlers above, exposed unchanged
 if (S.sound) S.mode = "intro"; // v242: boot into the epic intro (sound off boots straight to the title)
 window.SS={svcOpen:function(){return svcOpen;},svcArm:function(){return svcArm;},svc:function(){return svc;},svcSnd:function(){return svcSndIdx;},svcSndNames:function(){return SNDNAMES;},svcSpeed:function(){return SPEEDS[svc.spd];},diff:function(){return DIFF;},rollDest:rollDest,state:function(){return S;},manStands:function(){return MAN_STANDS;},flipSwitch:flipSwitch,switchLocked:switchLocked,onPointer:onPointer,
- nextNodeId:nextNodeId,spawnTrain:spawnTrain,startGame:startGame,toggleStart:toggleStart,step:step,fit:fit,canvas:canvas,draw:draw,
+ nextNodeId:nextNodeId,spawnTrain:spawnTrain,startGame:startGame,bControl:bControl,bNext:bNext,BNODES:BNODES,BSW:BSW,rollB:rollB,bLocked:bLocked,bSpawn:(function(x){return bSpawn(x);}),toggleStart:toggleStart,step:step,fit:fit,canvas:canvas,draw:draw,
  SPRITES:SPRITES,LEVERS:LEVERS,NODES:NODES,canvasPoint:canvasPoint,posBack:posBack,
  FONT:FONT,drawPixelText:drawPixelText,STRIKEBOX:STRIKEBOX,CHIPBOX:CHIPBOX,highScores:function(){return highScores;},hsPending:function(){return hsPending;},musicOn:function(){return MUS_ON;},MUSIC:MUSIC,kickMusic:kickMusic,musUnlock:musUnlock,ANTHEM:ANTHEM,BOSS:BOSS,PRE:PRE,musSong:function(){return MUS_ON?(MUS_SONG===ANTHEM?"anthem":MUS_SONG===BOSS?"boss":MUS_SONG===PRE?"pre":"title"):null;},musFc:function(){return musFilt?musFilt.frequency.value:null;},musState:function(){return AC?AC.state:"none";},cineInfo:function(){return {phase:introPhase,line:introLine,typed:introTypedCount(),panels:2,ev:introEvent||""};},introInfo:function(){return {mode:S.mode,pat:(MUS_ON&&MUS_SONG===MUSIC)?musPat:-1,row:musRow};},tableInput:tableInput,scoreQualifies:scoreQualifies,enterTable:enterTable,attractTable:attractTable,tableConfirm:tableConfirm,blazeX:blazeX,SIDE_LOCO:SIDE_LOCO,SIDE_WAGON:SIDE_WAGON,blazeInfo:blazeInfo,titleStand:function(){return titleStandFlip?2:1;},titleGag:function(){return titleFail?(titleBoomDone?"boom":(titleDerailT>0?"derail":"armed")):"none";},SIDE_LOCO_L:SIDE_LOCO_L,blazeOn:blazeOn,displayRows:displayRows,tableReveal:tableReveal};
 </script>
