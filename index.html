@@ -60,7 +60,8 @@
 </div>
 <script>
 "use strict";
-// ===== Super Switchman v292 (PWA build) =====
+// ===== Super Switchman v293 (PWA build) =====
+// v293 (Tim): "Make them proper turnouts" - Game B track changes are real crossovers: two reverse arcs (an S, run 220) drawn as branch rails with ties and a switch stand; ONE/TWO throw the switch (B.want), the train takes the curve as the world carries it and the wagons follow the same rails car by car; a switch thrown during SWITCHTIME waits with the frozen world, like Game A. Title line corrected to THE RUN EAST. Carries v292.
 // v292 (Tim): Game B is REBUILT as a side scroller - one train east, hazards and oncoming traffic, horn for livestock, ghost train the wildcard; each level a seeded preset that stays put. The v291 switch-yard Game B is retired whole. Carries v291.
 // v291 (Tim): GAME B - a second game in the cabinet, chosen in SERVICE (GAME row). Five tunnels in, three exits out; 5 crossover switches drop trains one line down; ONE/TWO walk the Switchman between posts, THREE throws the switch he mans. Exits have speeds not yards (1 EXPRESS double, 2 CENTRAL, 3 SLOW half); trains collide on shared track; the GHOST train never collides and scores anywhere. Game A untouched; B keeps its own high-score tables. Carries v290.
 // v290 (Tim): the in-game theme is redone as synthwave - CHORDS and FEEL, played by BASS AND PADS alone. The progression is THE synthwave progression, Am F C G (Em C G D retired): TRI pumps the octave 8ths (walking fill kept on the G bar) while SQ2 pads hold the chords root-to-fifth. No arp, no drums in the song - SQ1 speaks only when a switch throws it (the lead sound, off the pattern roots; F takes a major third now). Carries v289.
@@ -1633,7 +1634,7 @@
 // follows edges. (Supersedes v15's three-junction
 // main line — in the sketch the fan hangs off one trunk, not the main.)
 var W=540,H=640;
-var VERSION="v292"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
+var VERSION="v293"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
 var DEST=[
  null,
  {n:1,name:"RED ROCK", color:"#e53935"},
@@ -2238,9 +2239,9 @@ function genB(level){
   for(var b=0;b<blocked.length;b++){
    var ty=bag[Math.floor(rng()*bag.length)];
    var evx=Math.round(gx+(b===1?26:0));
-   if(ty==='on'||ty==='ghost'){ // westbound traffic never runs abreast: two movers
-    for(var q=0;q<events.length;q++){var pv=events[q]; // on different tracks would
-     if((pv.t==='on'||pv.t==='ghost')&&Math.abs(pv.x-evx)<260){ty='rock';break;}} // wall the run
+   if(ty==='on'){ // westbound trains keep their distance: two movers arriving
+    for(var q=0;q<events.length;q++){var pv=events[q]; // together can interlock
+     if(pv.t==='on'&&Math.abs(pv.x-evx)<560){ty='rock';break;}} // a turnout's timing
    }
    var ev={t:ty,lane:blocked[b],x:evx,passed:false,dead:false,flee:0,yOff:0,sp:0};
    if(ty==='on'||ty==='ghost')ev.sp=Math.round(115+level*7+rng()*45);
@@ -2251,23 +2252,81 @@ function genB(level){
  return {len:len,events:events};
 }
 function bScroll(){return Math.min(235,148+(S.level-1)*11);}
+// v293: a turnout between the parallel tracks is two reverse arcs - an S
+// of run CROSS_L. crossY is the lateral ground covered at run t, crossSlope
+// its dy/dx; the same profile drives the train, the wagons and the rails.
+var CROSS_L=220;
+function crossY(c,t){
+ if(t<=0)return 0;if(t>=CROSS_L)return 2*c.w;
+ if(t<c.h)return c.R-Math.sqrt(c.R*c.R-t*t);
+ var u=t-c.h;return c.w+(Math.sqrt(c.R*c.R-(c.h-u)*(c.h-u))-Math.sqrt(c.R*c.R-c.h*c.h));
+}
+function crossSlope(c,t){
+ if(t<=0||t>=CROSS_L)return 0;
+ if(t<c.h)return t/Math.sqrt(c.R*c.R-t*t);
+ var u=c.h-(t-c.h);return u/Math.sqrt(c.R*c.R-u*u);
+}
+function pathLaneF(wx){ // which track the train's spine is on at world x wx
+ var B=S.b,list=B.crossList;
+ for(var i=0;i<list.length;i++){var c=list[i];
+  if(wx<c.x0)return c.from;
+  if(wx<=c.x0+CROSS_L)return c.from+c.s*crossY(c,wx-c.x0)/110;
+ }
+ return list.length?list[list.length-1].to:B.lane;
+}
+function pathAng(wx){
+ var B=S.b,list=B.crossList;
+ for(var i=0;i<list.length;i++){var c=list[i];
+  if(wx>=c.x0&&wx<=c.x0+CROSS_L)return Math.atan(c.s*crossSlope(c,wx-c.x0));
+ }
+ return 0;
+}
+function bCrossUpdate(){ // start/finish turnouts as the world carries the train
+ var B=S.b,list=B.crossList,last=list[list.length-1];
+ if(last&&!last.done){
+  if(B.px-last.x0>=CROSS_L){last.done=true;B.lane=last.to;}
+ }else if(B.want!==B.lane){
+  var to=B.lane+(B.want>B.lane?1:-1),d=(to-B.lane)*110,s=d>0?1:-1,h=CROSS_L/2,w=Math.abs(d)/2;
+  list.push({x0:B.px,from:B.lane,to:to,s:s,h:h,w:w,R:(h*h+w*w)/(2*w),done:false});
+  B.crossCount++;
+ }
+ B.laneF=pathLaneF(B.px);
+ B.crossList=list.filter(function(c){return c.x0+CROSS_L>B.px-200;});
+}
+function drawCrossB(c){ // one thrown turnout, drawn as a real branch
+ var B=S.b;if(c.x0+CROSS_L<B.px-260||c.x0>B.px+460)return;
+ var INK="#b0bec5",t;
+ function pt(t2){return [c.x0+t2-B.px+150,laneY(c.from+c.s*crossY(c,t2)/110)];}
+ for(t=6;t<CROSS_L;t+=26){var p=pt(t),a=Math.atan(c.s*crossSlope(c,t)),nx=-Math.sin(a),ny=Math.cos(a);
+  ctx.fillStyle=INK;
+  [-7,0,7].forEach(function(o){ctx.fillRect(p[0]+nx*o-2,p[1]+ny*o-2,4,4);});}
+ [-4.5,4.5].forEach(function(off){
+  var prev=null;
+  for(t=0;t<=CROSS_L;t+=10){var p2=pt(t),a2=Math.atan(c.s*crossSlope(c,t)),q=[p2[0]-Math.sin(a2)*off,p2[1]+Math.cos(a2)*off];
+   if(prev)drawPixelLine(prev[0],prev[1],q[0],q[1],3,3,INK);
+   prev=q;}
+ });
+ var sp=pt(0),base=laneY(c.from)+(c.s>0?15:-21); // the switch stand at the divergence
+ ctx.fillStyle="#4e342e";ctx.fillRect(sp[0]-2,base,4,8);
+ ctx.fillStyle="#fdd835";ctx.fillRect(sp[0]-4,base+(c.s>0?8:-6),8,6);
+}
 function bLoadLevel(){
  var g=genB(S.level),B=S.b;
- B.len=g.len;B.events=g.events;B.px=0;B.lane=1;B.laneF=1;B.bannerT=1.8;B.invulnT=0;
+ B.len=g.len;B.events=g.events;B.px=0;B.lane=1;B.laneF=1;B.want=1;B.crossList=[];B.bannerT=1.8;B.invulnT=0;
 }
 function bInit(){
- S.b={px:0,lane:1,laneF:1,events:[],len:0,hornT:0,invulnT:0,bannerT:1.8,booms:[]};
+ S.b={px:0,lane:1,laneF:1,want:1,crossList:[],crossCount:0,events:[],len:0,hornT:0,invulnT:0,bannerT:1.8,booms:[]};
  bLoadLevel();
 }
 function sndHorn(){beep(311,0.28,"square",0.06);beep(466,0.28,"square",0.05);}
-function bControl(i){ // Game B panel: ONE up a track, TWO down a track, THREE the horn
+function bControl(i){ // Game B panel: ONE/TWO throw the next turnout, THREE the horn
  var B=S.b;if(!B||S.mode!=="run")return;
- if(i===0){if(B.lane>0){B.lane--;beep(700,0.04,"square",0.03);}else sndLock();}
- else if(i===1){if(B.lane<2){B.lane++;beep(700,0.04,"square",0.03);}else sndLock();}
+ if(i===0){if(B.want>0){B.want--;beep(700,0.04,"square",0.03);}else sndLock();}
+ else if(i===1){if(B.want<2){B.want++;beep(700,0.04,"square",0.03);}else sndLock();}
  else{
   B.hornT=0.45;sndHorn();
   for(var k=0;k<B.events.length;k++){var ev=B.events[k];
-   if(ev.t==='cow'&&!ev.dead&&ev.lane===B.lane&&ev.x>B.px&&ev.x-B.px<280)ev.flee=1;}
+   if(ev.t==='cow'&&!ev.dead&&ev.lane===B.want&&ev.x>B.px&&ev.x-B.px<280)ev.flee=1;}
  }
 }
 function bStrike(ev){
@@ -2280,6 +2339,7 @@ function bStrike(ev){
 function bStep(dt){
  var B=S.b;if(!B)return;
  B.px+=bScroll()*dt;
+ bCrossUpdate();
  var i,ev;
  for(i=0;i<B.events.length;i++){ev=B.events[i];
   if(ev.dead)continue;
@@ -2316,10 +2376,10 @@ function bStep(dt){
   S.level++;bLoadLevel();
  }
 }
-function bAlways(dt){ // runs even inside SWITCHTIME - the lane change is the watch's whole point
+function bAlways(dt){ // timers only - since v293 the train's track comes from the
+ // turnout profile in bStep, so a half-taken turnout waits out SWITCHTIME
+ // with the frozen world; the thrown switch (B.want) is remembered.
  var B=S.b;if(!B)return;
- var diff=B.lane-B.laneF,step=3.4*dt;
- if(Math.abs(diff)<=step)B.laneF=B.lane;else B.laneF+=diff>0?step:-step;
  if(B.hornT>0)B.hornT-=dt;
  if(B.invulnT>0)B.invulnT-=dt;
  if(B.bannerT>0)B.bannerT-=dt;
@@ -2334,6 +2394,8 @@ function drawBoardB(){
   tieCarry=-(B.px%13);
   drawTrackEdgeB(-30,BLANES_Y[L],570,BLANES_Y[L]);
  }
+ // v293: every turnout this run has thrown, drawn as a real branch
+ for(var ci=0;ci<B.crossList.length;ci++)drawCrossB(B.crossList[ci]);
  // lineside poles rolling by
  var w0=Math.floor((B.px-220)/280)*280;
  for(var wx=w0;wx<B.px+560;wx+=280){
@@ -2372,11 +2434,11 @@ function drawBoardB(){
  }
  // your train - gold, wearing the level number; it blinks while untouchable
  var py=laneY(B.laneF),blink=B.invulnT>0&&Math.floor(ANIM_T*10)%2===0;
- if(!blink){
-  var ang=Math.atan2(laneY(B.lane)-py,120),num=((S.level-1)%9)+1;
-  drawCar(38,py,ang,"#fdd835",false,num);
-  drawCar(94,py,ang,"#fdd835",false,num);
-  drawCar(150,py,ang,"#fdd835",true,num);
+ if(!blink){ // each car rides the rails at its own x - wagons follow the curve
+  var num=((S.level-1)%9)+1;
+  drawCar(38,laneY(pathLaneF(B.px-112)),pathAng(B.px-112),"#fdd835",false,num);
+  drawCar(94,laneY(pathLaneF(B.px-56)),pathAng(B.px-56),"#fdd835",false,num);
+  drawCar(150,py,pathAng(B.px),"#fdd835",true,num);
  }
  if(B.hornT>0){ // the honk, drawn
   ctx.strokeStyle="#ffffff";ctx.lineWidth=2;
@@ -2862,7 +2924,7 @@ function drawStartScreen(){
  if(titleSwearT>0){titleSwearT-=1/60;ctx.fillStyle="#ffffff";ctx.fillRect(150,208,106,34);ctx.fillRect(188,242,10,8);ctx.strokeStyle="#111111";ctx.lineWidth=2;ctx.strokeRect(150,208,106,34);drawPixelText("@&#%!",203,218,3,"#111111","center");} // v266: his signature swear, title edition
  drawPixelText("ROUTE EVERY TRAIN TO ITS OWN COLOR",W/2,448,3,"#a5d6a7","center");
  drawPixelText("YOU RUN THE SWITCHES NOT THE TRAIN",W/2,482,3,"#a5d6a7","center");
- if(svc.game==="B")drawPixelText("GAME B - FIVE TUNNELS THREE EXITS",W/2,512,3,"#fdd835","center"); // v291
+ if(svc.game==="B")drawPixelText("GAME B - THE RUN EAST",W/2,512,3,"#fdd835","center"); // v293
  if(Math.floor(ANIM_T*1.4)%2===0)drawPixelText("TAP START",W/2,540,3,"#ffb300","center");
  drawPixelText("(C) 1983 DAISOFT",W/2,606,3,"#78909c","center");
  drawPixelText(VERSION,10,606,3,"#78909c","left"); // v285 (Tim): version, bottom left
