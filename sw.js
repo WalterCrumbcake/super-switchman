@@ -1,5 +1,5 @@
 // Super Switchman service worker - cache-first app shell.
-var CACHE = "super-switchman-v278";
+var CACHE = "super-switchman-v281";
 var SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 self.addEventListener("install", function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(SHELL); }).then(function(){ return self.skipWaiting(); }));
