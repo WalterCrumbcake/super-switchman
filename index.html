@@ -60,7 +60,8 @@
 </div>
 <script>
 "use strict";
-// ===== Super Switchman v297 (PWA build) =====
+// ===== Super Switchman v298 (PWA build) =====
+// v298 (Tim, hands-on): "Warden is see through on the game over end scene" - Tim's character grids have hollow interiors (33 enclosed unfilled cells in WARDEN, 28 in WARDEN_UP, 12 in the Switchman): the room showed through the face, chest and legs. A load-time fillHoles() now floods every fully-enclosed 0 with the majority color around its pocket (face pockets go skin, torso pockets go coat) and all character draws use the filled grids; the source grids stay byte-for-byte Tim's. Carries v297.
 // v297 (Tim, hands-on): "Still not clear if something is ahead" - the warnings move into the HUD where the zoom cannot shrink them: an AHEAD panel (one row per track: the next hazard's icon + distance pips, or CLEAR) and big flashing chevrons at the east edge for hazards still off-screen. The small in-board arrows from v296 are removed. Carries v296.
 // v296 (Tim, hands-on): "Still cant see upcoming hazards" - Game B zooms out further (0.5, about 870px of track ahead) and every track now announces its nearest off-screen hazard with a colored warning arrow at the east edge (red = westbound train, gray = rockfall, white = cow) until the hazard itself scrolls in. Carries v295.
 // v295 (Tim, hands-on): "Zoom game b out, no idea what's coming" + "turnouts start invisible" - the Game B board draws at 0.6 zoom anchored on the train (about 700px of track ahead instead of 390), every switch site's crossover track is drawn dim from the start so turnouts read as real track the moment they scroll in, and the set route previews over it in full ink. Carries v294.
@@ -1638,7 +1639,7 @@
 // follows edges. (Supersedes v15's three-junction
 // main line — in the sketch the fan hangs off one trunk, not the main.)
 var W=540,H=640;
-var VERSION="v297"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
+var VERSION="v298"; // v285: shown bottom-left on the title screen; harness asserts it matches this header // vertical arcade screen (v52: height fitted to the moved-up layout)
 var DEST=[
  null,
  {n:1,name:"RED ROCK", color:"#e53935"},
@@ -2910,8 +2911,34 @@ function drawSprite(grid,x,y,rot,color,cell){
 // the lantern arm ride the bob; his two legs alternate as he walks.
 var ANIM_T=0;
 function manSay(text){S.man.say=text;S.man.sayT=1.4;}
+function fillHoles(g){ // v298: Tim's character grids have hollow interiors -
+ // unfilled pockets inside the silhouette that the room shows through.
+ // Fill every fully-enclosed 0 with the majority color around its pocket;
+ // open air and his line art stay exactly as drawn.
+ var R=g.length,C=g[0].length,r,c,out=g.map(function(row){return row.split('');});
+ var seen=[],q=[];
+ for(r=0;r<R;r++){seen.push([]);for(c=0;c<C;c++)seen[r][c]=false;}
+ for(r=0;r<R;r++)for(c=0;c<C;c++)if((r===0||c===0||r===R-1||c===C-1)&&out[r][c]==='0'){seen[r][c]=true;q.push([r,c]);}
+ while(q.length){var p=q.pop();
+  for(var d=0;d<4;d++){var nr=p[0]+[1,-1,0,0][d],nc=p[1]+[0,0,1,-1][d];
+   if(nr>=0&&nc>=0&&nr<R&&nc<C&&!seen[nr][nc]&&out[nr][nc]==='0'){seen[nr][nc]=true;q.push([nr,nc]);}}}
+ for(r=0;r<R;r++)for(c=0;c<C;c++){
+  if(out[r][c]!=='0'||seen[r][c])continue;
+  var region=[],tally={},q2=[[r,c]];seen[r][c]=true;
+  while(q2.length){var p2=q2.pop();region.push(p2);
+   for(var d2=0;d2<4;d2++){var nr2=p2[0]+[1,-1,0,0][d2],nc2=p2[1]+[0,0,1,-1][d2];
+    if(nr2<0||nc2<0||nr2>=R||nc2>=C)continue;
+    if(out[nr2][nc2]==='0'&&!seen[nr2][nc2]){seen[nr2][nc2]=true;q2.push([nr2,nc2]);}
+    else if(out[nr2][nc2]!=='0')tally[out[nr2][nc2]]=(tally[out[nr2][nc2]]||0)+1;}}
+  var best='2',bn=-1;for(var k in tally)if(tally[k]>bn){bn=tally[k];best=k;}
+  for(var ri=0;ri<region.length;ri++)out[region[ri][0]][region[ri][1]]=best;}
+ return out.map(function(row){return row.join('');});
+}
+var WARDEN_SOLID=null,WARDEN_UP_SOLID=null;
+function filledWarden(up){ if(up){if(!WARDEN_UP_SOLID)WARDEN_UP_SOLID=fillHoles(WARDEN_UP);return WARDEN_UP_SOLID;}
+ if(!WARDEN_SOLID)WARDEN_SOLID=fillHoles(WARDEN);return WARDEN_SOLID;}
 function drawMan(cx,feetY,cell,moving,ph,throwT,look,tuck,noLant){
- var g=SPRITES.switchman;var MANPAL=[null,"#fdd835","#1e88e5","#ffffff"]; // v164: TIM'S 2-bit SWITCHMAN - yellow face/hands, BLUE overalls and cap, white shirt (PAL 2:#fdd835, 3:#1e88e5, 4:#ffffff)
+ var g=SPRITES.switchmanF||(SPRITES.switchmanF=fillHoles(SPRITES.switchman));var MANPAL=[null,"#fdd835","#1e88e5","#ffffff"]; // v164: TIM'S 2-bit SWITCHMAN - yellow face/hands, BLUE overalls and cap, white shirt (PAL 2:#fdd835, 3:#1e88e5, 4:#ffffff)
  var bob=moving?Math.abs(Math.sin(ph))*1.2:0; // v111 (Tim): no hover at idle — he stands still at his post
  var ox=cx-7*cell,oy=feetY-22*cell+bob*cell;
  function stamp(r0,r1,c0,c1,dy,dx){
@@ -3024,9 +3051,9 @@ var LANTERN=["0010","0131","0121","0111"]; // v151: TIM'S 2-bit LANTERN redraw (
 // RISES when armUp goes 0 -> 1 (v128: his OTHER arm — rows 8-9, cols 0-4).
 // Sprite data untouched.
 function drawWarden(cx,feetY,cell,moving,ph,armUp){
- var g=armUp>0.5?WARDEN_UP:WARDEN;var WPAL=[null,"#ffac99","#5e5b82","#ffffff"]; // v166: BOTH Warden frames are TIM'S 2-bit now (skin #ffac99, coat #5e5b82, hat/trim white)
+ var g=filledWarden(armUp>0.5);var WPAL=[null,"#ffac99","#5e5b82","#ffffff"]; // v166: BOTH Warden frames are TIM'S 2-bit now (skin #ffac99, coat #5e5b82, hat/trim white)
  var bob=moving?Math.abs(Math.sin(ph))*0.8:0;
- var upF=(g===WARDEN_UP),ox=cx-(upF?10:7)*cell,oy=feetY-23*cell+bob*cell,splitC=upF?11:8; // v130: the UP frame registers its body +3 cols over
+ var upF=armUp>0.5,ox=cx-(upF?10:7)*cell,oy=feetY-23*cell+bob*cell,splitC=upF?11:8; // v130: the UP frame registers its body +3 cols over
  var p2=Math.floor(ph/Math.PI)%2;
  for(var r=0;r<g.length;r++)for(var c=0;c<g[r].length;c++){
   if(g[r][c]==="0")continue;ctx.fillStyle=WPAL[+g[r][c]];
@@ -3042,7 +3069,7 @@ function drawRageFace(t){ // v270 (Tim) SHOT 1: zoomed in on the Warden's face -
  ctx.fillStyle="#000";ctx.fillRect(0,0,W,H);
  var amp=2+t*3,jx=(Math.random()*2-1)*amp,jy=(Math.random()*2-1)*amp;
  var skin=t<0.5?"#ffac99":(t<1.0?"#ff7a59":"#e53935");
- drawGlyphC(ctx,WARDEN,270+jx,330+jy,30,[null,skin,"#5e5b82","#ffffff"]);
+ drawGlyphC(ctx,filledWarden(false),270+jx,330+jy,30,[null,skin,"#5e5b82","#ffffff"]);
 }
 function drawOfficeRun(t){ // v270 (Tim) SHOT 2: the office - he runs around the desk and at the camera
  ctx.fillStyle="#0a0f1c";ctx.fillRect(0,0,W,452);
@@ -3252,7 +3279,7 @@ function drawIntroDialog() {
   for (var bq = 0; bq < bolt.length - 1; bq++) { for (var bs = 0; bs <= 8; bs++) { var bx = bolt[bq][0] + (bolt[bq + 1][0] - bolt[bq][0]) * bs / 8, by = bolt[bq][1] + (bolt[bq + 1][1] - bolt[bq][1]) * bs / 8; ctx.fillRect(PX(bx, 0.3) - 3 * cz, PY(by, 0.3) - 3 * cz, 6 * cz, 6 * cz); } }
   ctx.fillStyle = "rgba(225,235,255,0.55)"; ctx.fillRect(0, 0, 540, 640);
  }
- var last = introLine === INTRO_DIALOG.length - 1, wg = last ? WARDEN_UP : WARDEN, ww = last ? 17 : 14;
+ var last = introLine === INTRO_DIALOG.length - 1, wg = last ? filledWarden(true) : filledWarden(false), ww = last ? 17 : 14;
  drawGlyphC(ctx, wg, PX(352, 0.75), PY(326, 0.75), 11 * cz, [null, "#ffac99", "#5e5b82", "#ffffff"]); // v262: drawGlyphC anchors CENTER - (352, 326) puts his feet on the floor at 452, behind the desk
  RR(190, 312, 430, 14, 1.0, "#5a3a1e"); RR(190, 326, 430, 3, 1.0, "#8a6d1f");
  RR(196, 329, 418, 141, 1.0, "#2e1a0c"); RR(196, 462, 418, 3, 1.0, "#8a6d1f"); RR(322, 386, 96, 16, 1.0, "#8a6d1f"); RR(326, 390, 88, 8, 1.0, "#5a3a1e");
